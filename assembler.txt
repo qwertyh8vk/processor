@@ -1,0 +1,6 @@
+PUSH 123
+:1 
+IN 
+JMP :1
+HLT
+
