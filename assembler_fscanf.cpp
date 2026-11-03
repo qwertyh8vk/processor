@@ -1,23 +1,6 @@
 #include "assembler_fscanf.h"
 #include "enum_djb.h"
 
-/*
-Список текущих тудушек:
-
-    1) обработать все команды кроме MOD в первом и втором валидейте.
-    2) прооверка на долбаеба (есть ли лишний аргумент, а именно: там где "1 число на одной строке должно быть одно число, 2 числа на одной строке должно быть два числа.")
-    По поводу тудушки два обязательно спросить у ИИ как он бы реализовал это дерьмо на моём месте
-
-
-    !!!!!!!!!!!!
-    // прочитать из памяти в регистр, записать из регистра в память
-    // память - это просто массив
-    // видеопамять - это тоже прсото массив , но у тебя есть специальная инструкция, какая хочешь сам задавай
-    // в процессоре избавиться от копипасты - это макросы, посидеть подумать
-    // ХЭШИ!!!!!!!!!!!!! 
-
-*/
-
 int main() {
 
     // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // //
@@ -26,16 +9,42 @@ int main() {
     // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // //
     // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // //
 
-    const char* to_be_assemblered                 = "assembler.txt"; // пока что .txt, потом сделаем бинарщину
-    const char* assemblered_file                  = "assembler_res.txt";
-    const char* assemblered_file_after_first_asm  = "assembler_res_after_first.txt";
+    const char*    to_be_assemblered                 = "assembler.txt"; // пока что .txt, потом сделаем бинарщину
+    const char*    assemblered_file                  = "assembler_res.txt";
+    const char*    assemblered_file_after_first_asm  = "assembler_res_after_first.txt";
 
-    potential_error obrabotka_faila_status = obrabotka_faila(to_be_assemblered, assemblered_file, assemblered_file_after_first_asm);
+    struct stat    to_be_assemblered_struct;
 
-    return obrabotka_faila_status;
+    char*          file_buffer  = initialize_file_buffer(to_be_assemblered, &to_be_assemblered_struct);
+    uint8_t* bytecode     = (uint8_t *)calloc(to_be_assemblered_struct.st_size + 1, sizeof(char));
+    
+    bytecode[to_be_assemblered_struct.st_size] = '\0';
+
+    if (file_buffer != NULL) {
+        potential_error error_after_load = load_file_buffer(to_be_assemblered, file_buffer, to_be_assemblered_struct.st_size);
+        if (error_after_load != OK) { return error_after_load; }
+        for (off_t i = 0; i < to_be_assemblered_struct.st_size + 1; i++) {
+            if (file_buffer[i] == '\n') {
+                printf("[\\");
+                printf("n] ");
+            }
+
+            else if (file_buffer[i] == '\0') {
+                printf("[\\");
+                printf("0] ");
+            }
+
+            else { printf("[%c] ", file_buffer[i]); }
+        }
+        printf("\n");
+    }
+
+    // potential_error obrabotka_faila_status = obrabotka_faila(to_be_assemblered, assemblered_file, assemblered_file_after_first_asm);
+    
+    return OK;
 }
 
-potential_error obrabotka_faila(const char* filename_in, const  char* filename_out, const char* filename_out_after_first_asm) {
+potential_error obrabotka_faila(char* file_buffer,  char* bytecode, const char* filename_out_after_first_asm) {
     long long labels_array[MAX_LABELS_AMOUNT] = {0};
 
     for (int i = 0; i < MAX_LABELS_AMOUNT; i++) {
@@ -43,231 +52,546 @@ potential_error obrabotka_faila(const char* filename_in, const  char* filename_o
     }
 
     size_t          commands_and_arguments_counted = 0;
-    potential_error assemble_file_stage_1 = assemble_file_second(filename_in, filename_out, labels_array, FIRST, &commands_and_arguments_counted);
+    potential_error assemble_file_stage_1 = assemble_file_second(file_buffer, bytecode, labels_array, FIRST, &commands_and_arguments_counted);
     PRINTF("Ошибка после первого ассембла: [%d]\n", assemble_file_stage_1);
     GETCHAR();
     PRINTF("Количество прочитанных символов: [%zu]\n", commands_and_arguments_counted);
     GETCHAR(); 
 
-    /* идея следующая сделать возвращаемое значение assemble_file_first не enum а long long - количество ячеек с операциями и аргументами.*/
-    /* а в assemble_file_second записывать первым числом размер этого файла. можно сделать служебную структурку которая всё будет сверять. */
-    /* убираем одну функцию ассемблирования, одну делаем с флагом компиляции просто*/
-
-    potential_error assemble_file_stage_2 = assemble_file_second(filename_in, filename_out, labels_array, SECOND, &commands_and_arguments_counted);
+    potential_error assemble_file_stage_2 = assemble_file_second(file_buffer, bytecode, labels_array, SECOND, &commands_and_arguments_counted);
     PRINTF("Ошибка после второго ассембла: [%d]\n", assemble_file_stage_2);
     GETCHAR();
 
     return OK;
 }
 
-potential_error register_processing(FILE* in, FILE* out, const char* func_name, asm_commands_nums func_enum, progon_index progon_index) {
-    char reg[MAX_COMMAND_LEN] = {0};
+char*           initialize_file_buffer(const char* filename, struct stat* file_buffer_struct) {
+    assert(filename);
 
-    if (fscanf(in, "%7s", reg) != 1) { 
-        fprintf(stderr, "[%s]: нет регистра\n", func_name); 
-        
-        return NO_REGISTER; 
-    }
+    int stat_status = stat(filename, file_buffer_struct);
 
-    int number_of_reg = reg_code(reg);
+    if (stat_status == 0) {
+        off_t file_buffer_size = file_buffer_struct->st_size;
+        char* file_buffer = (char *)calloc(file_buffer_size + 1, sizeof(char));
 
-    if (number_of_reg < 0) {
-        fprintf(stderr, "Неизвестный регистр: %s\n", reg); 
-
-        return UNKNOWN_REG; 
-    }
-
-    if (progon_index == SECOND) { fprintf(out, "%d %d\n", func_enum, number_of_reg); } 
-
-    return OK;
-}
-
-potential_error any_jump_processing(FILE* in, FILE* out, long long* labels_array, 
-                                    const char* func_name, asm_commands_nums func_enum, progon_index progon_index) {
-    unsigned int label_index = 0;
-    char         label[MAX_COMMAND_LEN] = {};
-
-    if (fscanf(in, "%7s", label) != 1) { 
-        fprintf(stderr, "[%s]: нет метки\n", func_name);
-        
-        return NO_LABEL_AFTER_CMD; 
-    }
-
-    else {
-        char* end_ptr = NULL;
-        label_index   = strtol((label + 1 * sizeof(char)), &end_ptr, 10);
-
-        if (label_index > 0 && label_index < MAX_LABELS_AMOUNT - 1) {
-            PRINTF("Индекс метки корреткный, допустимый\n");
-            PRINTF("Индекc метки в массиве: [%u]\n", label_index);
+        if (file_buffer != NULL) {
+            PRINTF("успешно закаллокали\n");
             GETCHAR();
 
-            if (progon_index == SECOND) { fprintf(out, "%d %lld\n", func_enum, labels_array[label_index]); }// func_enum вместо JUMP_ASM
+            return file_buffer;
+        }
+        
+        else { PRINTF("проблема с каллоком\n"); return NULL; }
+    }
+
+    else { PRINTF("проблемы со статом\n"); return NULL; }
+
+}
+
+potential_error load_file_buffer(const char* filename, char* file_buffer, off_t struct_size) {
+    int file_descr = open(filename, O_RDONLY);
+
+    if (file_descr != -1) {
+        ssize_t bytes_read = read(file_descr, file_buffer, struct_size);
+        
+        if (bytes_read == struct_size) {
+            PRINTF("всё окей, размеры совпадают\n");
+            GETCHAR();
+            
+            file_buffer[struct_size] = '\0';
+            bytes_read++;
 
             return OK;
         }
 
         else {
-            PRINTF("Индекc метки в массиве: [%u]\n", label_index);
-            PRINTF("индекс метки некорректный, (выходит за рамки допустимых значений), дропаю ассемблирование\n");
+            PRINTF("что-то пошло не так\n");
             GETCHAR();
 
-            return INCORRECT_LABEL;
-        }
-    }
-}
-
-potential_error processing_labels(const char* command, long long* labels_array, long long command_index, FILE* out, progon_index progon_index) {
-    size_t length_of_command = strlen(command);
-
-    PRINTF("<%s> command, дебажный принт в функции processing_labels\n", command);
-    GETCHAR();
-
-    if (length_of_command <= 4 && command[0] == ':') {
-        PRINTF("<%s> command, КОМАНДА ПРАВИЛЬНАЯ (ДЛИНА МЕНЬШЕ ИЛИ РАВНА 4 И НАЧИНАЕТСЯ С ДВОЕТОЧИЯ)\n", command);
-        GETCHAR();
-
-        char* end_ptr;
-        long  label_index_in_array = strtol((command + 1 * sizeof(char)), &end_ptr, 10); // вопрос есть щас узнаем
-
-        if (label_index_in_array > 0 && label_index_in_array < MAX_LABELS_AMOUNT - 1) {
-            PRINTF("Индекс метки корреткный, DEFAULT, допустимый\n");
-            PRINTF("Label value: [%ld]\n", label_index_in_array);
-            GETCHAR();
-
-            labels_array[label_index_in_array] = command_index;
-
-            PRINTF("Я записал в массив меток [%ld] значение [%lld]\n", label_index_in_array, labels_array[label_index_in_array]);
-            GETCHAR();
-
-            if      (progon_index == FIRST)  { fprintf(out, "Место метки в массиве: [%ld], метка указывает на индекс массива с номером: [%lld]\n", label_index_in_array, command_index); }
-            else if (progon_index == SECOND) { PRINTF("НИЧЕГО НЕ ПЕЧАТАЮ, ВТОРОЙ ПРОГОН\n"); GETCHAR(); }
-        }
-
-        else {
-            PRINTF("Индекс метки некорректный, выключаю нахуй ассемблирование\n");
-            GETCHAR();
-
-            return INCORRECT_LABEL;
+            return COMPARISON_FAILED;
         }
     }
 
     else {
-        PRINTF("Ну, поскольку мы в дефолте, и я попал в дефолтовский else, то это точно неизвестная нам команда\n");
-        GETCHAR();
-
-        return UNKNOWN_COMMANDLETTE;
-    }
-
-    return OK;
-}
-
-potential_error push_separate_validating(FILE* in, FILE* out, progon_index progon_index) {
-    STACK_DATA_TYPE value = 0;
-
-    if (fscanf(in, "%lf", &value) != 1) { 
-        fprintf(stderr, "PUSH: нет аргумента\n"); 
-        
-        return NO_ARG; 
-    }
-
-    if (progon_index == SECOND) { fprintf(out, "%d %lf\n", PUSH_ASM, value); }     
-
-    return OK;
-}
-
-potential_error assemble_file_second(const char* filename_in, const char* filename_out, long long* labels_array, 
-                                     progon_index progon_index, size_t* commands_and_arguments_counted) {
-    assert(filename_in);
-    assert(filename_out);
-
-    FILE* in  = fopen(filename_in,  "r");
-    FILE* out = fopen(filename_out, "w");
-
-    PRINTF("[%p], [%p]\n", in, out);
-    char command[MAX_COMMAND_LEN] = {};
-    long long command_index       = 0;
-                                        
-    if (in != NULL) {
-        if (progon_index == SECOND) { fprintf(out, "Service information for CPU: [%zu]\n", *commands_and_arguments_counted); }
-
-        while (fscanf(in, "%7s", command) == 1) {
-            uint32_t command_number = djb2_calculate_enum_hash(command);
-
-            PRINTF("=======================================================\n");
-            PRINTF("<%u> как я это запаковал, " 
-                   "<%s> что это\n", command_number, command);
-            PRINTF("=======================================================\n");
-            GETCHAR();
-
-            switch (command_number) {
-                case PUSH: { // два аргумента
-                    potential_error error_aft_push_validating = push_separate_validating(in, out, progon_index);     
-                    if (error_aft_push_validating != OK) { return error_aft_push_validating; }    
-                    command_index += 2;      
-                    break; 
-                }
-
-                MOKRIY_CASE_NOFUNC(POP);
-                MOKRIY_CASE_NOFUNC(ADD);
-                MOKRIY_CASE_NOFUNC(SUB);
-                MOKRIY_CASE_NOFUNC(DIV);
-                MOKRIY_CASE_NOFUNC(MUL);
-                MOKRIY_CASE_NOFUNC(IN);
-                MOKRIY_CASE_NOFUNC(SQRT);
-                MOKRIY_CASE_NOFUNC(RET);   
-                MOKRIY_CASE_NOFUNC(OUT);
-                MOKRIY_CASE_NOFUNC(HLT);
-                MOKRIY_CASE_NOFUNC(DUP);
-                MOKRIY_CASE_NOFUNC(CMP);
-                MOKRIY_CASE_FUNC(PSHR,  register_processing(in, out, "PSHR", PSHR_ASM, progon_index));
-                MOKRIY_CASE_FUNC(POPR,  register_processing(in, out, "POPR", POPR_ASM, progon_index));
-                MOKRIY_CASE_FUNC(JMPA,  any_jump_processing(in, out, labels_array, "JMPA", JMPA_ASM, progon_index));
-                MOKRIY_CASE_FUNC(JMPB,  any_jump_processing(in, out, labels_array, "JMPB", JMPB_ASM, progon_index));
-                MOKRIY_CASE_FUNC(JMPE,  any_jump_processing(in, out, labels_array, "JMPE", JMPE_ASM, progon_index));
-                MOKRIY_CASE_FUNC(JAE,   any_jump_processing(in, out, labels_array, "JAE",  JAE_ASM,  progon_index));
-                MOKRIY_CASE_FUNC(JBE,   any_jump_processing(in, out, labels_array, "JBE",  JBE_ASM,  progon_index));
-                MOKRIY_CASE_FUNC(JMP,   any_jump_processing(in, out, labels_array, "JMP",  JMP_ASM,  progon_index));
-                MOKRIY_CASE_FUNC(CALL,  any_jump_processing(in, out, labels_array, "CALL", CALL_ASM, progon_index));
-
-                default: { /* если встретили метку */
-                    potential_error status_after_default_val = processing_labels(command, labels_array, command_index, out, progon_index);
-                    if (status_after_default_val != OK) { return status_after_default_val; }
-                    break;
-                }
-            }
-
-            clear_command_array(command);
-        }
-
-        if (progon_index == FIRST) { *commands_and_arguments_counted = (command_index + 1); }
-
-        fclose(in);  // MANDATORY!!!!! нахуй
-        fclose(out); // MANDATORY!!!!! нахуй
-    }
-
-    else {
-        PRINTF("не удалось открыть файл\n");
-        GETCHAR();
+        PRINTF("проблема с open\n");
 
         return FILE_NOT_OPENNED;
     }
+}
+
+potential_error assemble_file_second(char*        buffer_in,    uint8_t* bytecode, long long* labels_array, 
+                                     progon_index progon_index, size_t*        commands_and_arguments_counted) 
+{
+    assert(buffer_in);
+    assert(bytecode);
+
+    long long  instruction_pointer = 0;
+    char       single_command_line[MAX_LINE + 1] = {};
+    int        debug_index                       = 0;
+
+    while (sscanf(buffer_in, "%256[^\n]%n", single_command_line, &debug_index) == 1) {
+
+        // прочитал строку в массив single_command_line
+
+        /*
+            1) проверил строку на корректность по длине - сделано
+            2) если корректна - вытащил команду - сделано
+            3) если такая команда есть - обработал операнды индивидуально по схеме
+            4) если операнды корректные - записал строку и прибавил счётчик команд через побитовую маску
+        */
+
+        potential_error check_length_status = validate_string_length(buffer_in, debug_index);
+
+        if (check_length_status == OK) {
+            debug_index += 1; // перешагнули через \n
+            buffer_in   += debug_index;
+
+            PRINTF("assemble_file_second||buffer_in||ГДЕ Я: [%s], [%c]", buffer_in, *buffer_in);
+            GETCHAR();
+            // 1 шаг выполнили
+
+            int      command_length = 0;
+            uint32_t command_hash   = pull_the_fucking_command(single_command_line, &command_length);
+            // 2 шаг выполнили . вытащили команду
+
+            // индекс сдвинутый на длину команды (ничего более)
+            char* command_line_ptr                   = single_command_line + command_length; 
+            potential_error process_command_status   = process_command_byhash(command_hash,          single_command_line, 
+                                                                              command_line_ptr,      labels_array, 
+                                                                              &instruction_pointer,  bytecode);
+            if (process_command_status == OK) {
+                PRINTF("команда успешно обработалась\n");
+                GETCHAR();
+
+            }
+        }
+
+        clear_command_array(single_command_line);
+        
+    }
+
+    if (progon_index == FIRST) { *commands_and_arguments_counted = (instruction_pointer + 1); }
 
     return OK;
 }
 
-int reg_code(const char *name) {
+potential_error process_command_byhash(uint32_t      command_hash,         char*           single_command_line, 
+                                        char*        command_line_ptr,     long long*      labels_array,
+                                        long long*   instruction_pointer,  uint8_t*        bytecode) {
+    switch (command_hash) {
 
-    if (strcmp(name, "AX") == 0) return 0;
-    if (strcmp(name, "BX") == 0) return 1;
-    if (strcmp(name, "CX") == 0) return 2;
-    if (strcmp(name, "DX") == 0) return 3;
+        MACROS_PROCESS_PUSH_POP_BY_HASH(PUSH, function);
+        MACROS_PROCESS_PUSH_POP_BY_HASH(POP,  function);
+
+        MACROS_PROCESS_ZERO_OPERAND_BY_HASH(ADD);
+        MACROS_PROCESS_ZERO_OPERAND_BY_HASH(SUB);
+        MACROS_PROCESS_ZERO_OPERAND_BY_HASH(MUL);
+        MACROS_PROCESS_ZERO_OPERAND_BY_HASH(DIV);
+        MACROS_PROCESS_ZERO_OPERAND_BY_HASH(SQRT);
+        MACROS_PROCESS_ZERO_OPERAND_BY_HASH(MOD);
+        MACROS_PROCESS_ZERO_OPERAND_BY_HASH(RET);
+        MACROS_PROCESS_ZERO_OPERAND_BY_HASH(IN);
+        MACROS_PROCESS_ZERO_OPERAND_BY_HASH(OUT);
+        MACROS_PROCESS_ZERO_OPERAND_BY_HASH(HLT);
+        MACROS_PROCESS_ZERO_OPERAND_BY_HASH(DUP);
+        MACROS_PROCESS_ZERO_OPERAND_BY_HASH(CMP);
+
+        MACROS_PROCESS_LABEL_COMMANDS_BY_HASH(JMP);
+        MACROS_PROCESS_LABEL_COMMANDS_BY_HASH(JMPA);
+        MACROS_PROCESS_LABEL_COMMANDS_BY_HASH(JMPB);
+        MACROS_PROCESS_LABEL_COMMANDS_BY_HASH(JAE);
+        MACROS_PROCESS_LABEL_COMMANDS_BY_HASH(JBE);
+        MACROS_PROCESS_LABEL_COMMANDS_BY_HASH(JMPE);
+        MACROS_PROCESS_LABEL_COMMANDS_BY_HASH(CALL);
+        
+        MACROS_DEFAULT_SITUATION();
     
-    return -1;
+    }
 }
 
-void clear_command_array(char* command) {
-    for (int i = 0; i < MAX_COMMAND_LEN; i++) {
+potential_error validate_push_command(char*              command_line_ptr, 
+                                      asm_commands_nums  func_asm_code, 
+                                      uint8_t*           bytecode,
+                                      long long*         instruction_pointer) 
+{
+    PRINTF("на каком мы сейчас символе: [%c], [%s]\n", *command_line_ptr, command_line_ptr);
+    GETCHAR();
+
+    STACK_DATA_TYPE chislo                = 0;
+    char reg[MAX_COMMAND_LEN]             = {};
+    int  debug_index                      = 0;
+    register_nums reg_enum = (register_nums)0;
+
+    if      (sscanf(command_line_ptr, "%lf%n", &chislo, &debug_index) == 1) 
+    {
+        PRINTF("считавшееся число: [%lf]\n", chislo);
+        GETCHAR();
+
+        reg_enum = determine_register(reg);
+        if (reg_enum < 0) { PRINTF("нераспозннаный регистр!\n"); return INCORRECT_REG; }
+
+        uint8_t func_asm_code_uint = (uint8_t)func_asm_code;
+        func_asm_code_uint = func_asm_code_uint | CONST_BIT;
+
+        *(bytecode + *instruction_pointer) = func_asm_code_uint;
+        *instruction_pointer += sizeof(uint8_t);
+
+        *(STACK_DATA_TYPE *)(bytecode + *instruction_pointer) = chislo;
+        *instruction_pointer += sizeof(STACK_DATA_TYPE);
+    } // push 123
+
+    else if (sscanf(command_line_ptr, "%lf + %15s%n", &chislo, reg, &debug_index) == 2 || 
+             sscanf(command_line_ptr, "%15s + %lf%n", reg, &chislo, &debug_index) == 2) 
+    {
+        PRINTF("считавшееся число и регистр: [%lf] и [%s]\n", chislo, reg);
+        GETCHAR();
+
+        reg_enum = determine_register(reg);
+        if (reg_enum < 0) { PRINTF("нераспозннаный регистр!\n"); return INCORRECT_REG; }
+
+        uint8_t func_asm_code_uint = (uint8_t)func_asm_code;
+        uint8_t reg_enum_uint      = (uint8_t)reg_enum;
+
+        func_asm_code_uint = func_asm_code_uint | CONST_BIT | REGISTER_BIT;
+
+        *(bytecode + *instruction_pointer) = func_asm_code_uint;
+        *instruction_pointer += sizeof(uint8_t);
+
+        *(STACK_DATA_TYPE *)(bytecode + *instruction_pointer) = chislo;
+        *instruction_pointer += sizeof(STACK_DATA_TYPE);
+
+        *(bytecode + *instruction_pointer) = reg_enum_uint;
+        *instruction_pointer += sizeof(uint8_t);
+    } // push 123 + ax или //push ax + 123
+
+    else if (sscanf(command_line_ptr, "%15s%n", reg, &debug_index) == 1) {
+        PRINTF("считавшийся регистр: [%s]\n", reg);
+        GETCHAR();
+
+        reg_enum = determine_register(reg);
+        if (reg_enum < 0) { PRINTF("нераспозннаный регистр!\n"); return INCORRECT_REG; }
+
+        uint8_t func_asm_code_uint = (uint8_t)func_asm_code;
+        uint8_t reg_enum_uint      = (uint8_t)reg_enum;
+
+        func_asm_code_uint = func_asm_code_uint | REGISTER_BIT;
+
+        *(bytecode + *instruction_pointer) = func_asm_code_uint;
+        *instruction_pointer += sizeof(uint8_t);
+
+        *(bytecode + *instruction_pointer) = reg_enum_uint;
+        *instruction_pointer += sizeof(uint8_t);
+    } // push ax
+
+    else if (sscanf(command_line_ptr, "[%15[^ ] + %lf]%n", reg, &chislo, &debug_index) == 2 ||
+             sscanf(command_line_ptr, "[%lf + %15[^ ]]%n", chislo, &reg, &debug_index) == 2 )
+    {
+        PRINTF("считавшиеся число и регистр: [%lf] и [%s]\n", chislo, reg);
+        GETCHAR();
+
+        reg_enum = determine_register(reg);
+        if (reg_enum < 0) { PRINTF("нераспозннаный регистр!\n"); return INCORRECT_REG; }
+
+        uint8_t func_asm_code_uint = (uint8_t)func_asm_code;
+        uint8_t reg_enum_uint      = (uint8_t)reg_enum;
+        
+        func_asm_code_uint = func_asm_code_uint | CONST_BIT | MEMORY_BIT | REGISTER_BIT;
+
+        *(bytecode + *instruction_pointer) = func_asm_code_uint;
+        *instruction_pointer += sizeof(uint8_t);
+
+        *(STACK_DATA_TYPE *)(bytecode + *instruction_pointer) = chislo;
+        *instruction_pointer += sizeof(STACK_DATA_TYPE);
+
+        *(bytecode + *instruction_pointer) = reg_enum_uint;
+        *instruction_pointer += sizeof(uint8_t);
+
+    } // push [ax + 123] push [123 + ax]
+
+    else if (sscanf(command_line_ptr, "[%lf]%n", &chislo, &debug_index) == 1)
+    {
+        PRINTF("считавшееся число: [%lf]\n", chislo);
+        GETCHAR();
+        
+        uint8_t func_asm_code_uint = (uint8_t)func_asm_code;
+        func_asm_code_uint = func_asm_code_uint | CONST_BIT | MEMORY_BIT;
+
+        *(bytecode + *instruction_pointer) = func_asm_code_uint;
+        *instruction_pointer += sizeof(uint8_t);
+
+        *(STACK_DATA_TYPE *)(bytecode + *instruction_pointer) = chislo;
+        *instruction_pointer += sizeof(STACK_DATA_TYPE);
+
+    } // push [ax + 123] push [123 + ax]
+
+    else if (sscanf(command_line_ptr, "[%15s]%n", reg, &debug_index) == 1)
+    {
+        PRINTF("считавшийся регистр: [%s]\n", chislo, reg);
+        GETCHAR();
+
+        reg_enum = determine_register(reg);
+        if (reg_enum < 0) { PRINTF("нераспозннаный регистр!\n"); return INCORRECT_REG; }
+
+        uint8_t func_asm_code_uint = (uint8_t)func_asm_code;
+        uint8_t reg_enum_uint      = (uint8_t)reg_enum;
+
+        func_asm_code_uint = func_asm_code_uint | MEMORY_BIT | REGISTER_BIT;
+
+        *(bytecode + *instruction_pointer) = func_asm_code_uint;
+        *instruction_pointer += sizeof(uint8_t);
+
+        *(bytecode + *instruction_pointer) = reg_enum_uint;
+        *instruction_pointer += sizeof(uint8_t);
+
+    } 
+
+    else {
+        PRINTF("нераспознанный формат ввода после push/pop'a\n");
+        GETCHAR();
+        
+        return INCORRECT_COMMAND_LINE;
+    }
+
+    char* pointer_on_str_after_args = command_line_ptr + debug_index;
+
+    PRINTF("на каком мы сейчас символе: [%c], [%s]\n", *pointer_on_str_after_args, pointer_on_str_after_args);
+    GETCHAR();
+
+    potential_error check_string_after_arg_status = check_string_after_arg(pointer_on_str_after_args);
+
+    if (check_string_after_arg_status == OK) {
+        
+    }
+
+    else {
+
+    }
+}
+
+register_nums   determine_register(char* reg) {
+    PRINTF("[%s], наш регистр", reg);
+    GETCHAR();
+
+    uint32_t register_hash = djb2_calculate_enum_hash(reg);
+
+    switch  (register_hash)
+    {
+        case AX:
+            return AX_ASM;
+
+        case BX:
+            return BX_ASM;
+
+        case CX:
+            return CX_ASM;
+        
+        case DX:
+            return DX_ASM;
+
+        default:
+            PRINTF("Регистр не распознан\n");
+            GETCHAR();
+
+            return (register_nums)-1;
+    }
+}
+
+potential_error validate_zero_operands_commands(char*              command_line_ptr, 
+                                                asm_commands_nums  func_asm_code, 
+                                                uint8_t*           bytecode,
+                                                long long*         instruction_pointer) 
+{
+    PRINTF("на каком мы сейчас символе: [%c], [%s]\n", *command_line_ptr, command_line_ptr);
+    GETCHAR();
+
+    while (*command_line_ptr == ' ') {
+        command_line_ptr++;
+    }
+
+    if (*command_line_ptr == '\n') {
+        PRINTF("проскипав пробелы мы дошли до слэш n, всё в порядке\n");
+        GETCHAR();
+
+        bytecode[*instruction_pointer] = (uint8_t)func_asm_code;
+        *instruction_pointer          += sizeof(uint8_t);
+
+        return OK;
+    
+    }
+    
+    else {
+        PRINTF("что-то есть после команды: [%c], [%s]\n", *command_line_ptr, command_line_ptr);
+        GETCHAR();
+
+        return INCORRECT_COMMAND_LINE;
+    }
+}
+
+potential_error check_string_after_arg(char* command_line_ptr) {
+    PRINTF("на каком мы сейчас символе: [%c], [%s]\n", *command_line_ptr, command_line_ptr);
+    GETCHAR();
+
+    while (*command_line_ptr == ' ') { command_line_ptr++; }
+
+    if (*command_line_ptr == '\n')   { return OK; }
+    else                             { return INCORRECT_COMMAND_LINE; }
+}
+
+potential_error validate_commands_only_labels(char*             command_line_ptr, 
+                                                long long*        labels_array, 
+                                                asm_commands_nums func_asm_code,
+                                                uint8_t*          bytecode,
+                                                long long*        instruction_pointer) 
+{
+    PRINTF("на каком мы сейчас символе: [%c], [%s]\n", *command_line_ptr, command_line_ptr);
+    GETCHAR();
+    
+    while (*command_line_ptr == ' ') {
+        command_line_ptr++;
+    }
+
+    if (*command_line_ptr == ':') {
+        PRINTF("проскипав пробелы мы дошли до двоеточия, всё в порядке\n");
+        GETCHAR();
+
+        command_line_ptr++;
+        char*     end_pointer = NULL;
+        long long label_index = strtoll(command_line_ptr, &end_pointer, 10);
+
+        if (end_pointer == command_line_ptr) {
+            PRINTF("число не найдено, end_ptr = command_line_ptr\n");
+            GETCHAR();
+
+            return INCORRECT_COMMAND_LINE;
+        }
+
+        PRINTF("[%lld] число которое мы сохранили\n", label_index);
+        GETCHAR(); // JMP  :102saas
+
+        long long current_instruction_to_jump  = labels_array[label_index]; // сохранили число типа C которое будет использовано в функции write_command
+
+        potential_error analayze_string_after_label_status = check_string_after_arg(end_pointer); 
+        /* вместо функции analyze_string_after_label , которая делает абсолютно ту же самую работу */
+
+        if (analayze_string_after_label_status == OK) {
+            PRINTF("после числа ничего нет, всё нормально");
+            GETCHAR();
+
+            uint8_t func_asm_code_uint = (uint8_t)func_asm_code;
+            func_asm_code_uint = func_asm_code_uint | CONST_BIT;
+
+            *(bytecode + *instruction_pointer) = func_asm_code_uint;
+            *instruction_pointer += sizeof(uint8_t);
+            
+            *(long long *)(bytecode + *instruction_pointer) = current_instruction_to_jump;
+            *instruction_pointer += sizeof(long long);
+
+            return OK;
+        }
+
+        else { PRINTF("нашли что-то после числа, строка некорректная\n"); GETCHAR(); return INCORRECT_COMMAND_LINE; }
+    }
+
+    else if (*command_line_ptr == '\n') {
+        PRINTF("проскипав пробелы дошли до конца строки <=> метки просто нет\n");
+        GETCHAR();
+
+        return INCORRECT_COMMAND_LINE;
+    }
+
+    else {
+        PRINTF("проскипав пробелы мы дошли до символа [%c], что : не является\n", *command_line_ptr);
+        GETCHAR();
+
+        return INCORRECT_COMMAND_LINE;
+    }
+}
+
+potential_error validate_labels_and_else(char*      single_command_line, 
+                                           long long* labels_array, 
+                                           long long  current_instruction) 
+{
+    PRINTF("Где я: [%s], [%c]", single_command_line, *single_command_line);
+    GETCHAR();
+
+    if (*single_command_line == ':') {
+        PRINTF("первый символ двоеточие, всё в порядке\n");
+        GETCHAR();
+
+        single_command_line++;
+        char*     end_pointer = NULL;
+        long long label_index = strtoll(single_command_line, &end_pointer, 10);
+
+        if (end_pointer == single_command_line) {
+            PRINTF("число не найдено, end_ptr = command_line_ptr\n");
+            GETCHAR();
+
+            return INCORRECT_COMMAND_LINE;
+        }
+
+        PRINTF("[%lld] число которое мы сохранили\n", label_index);
+        GETCHAR(); // JMP  :102saas
+
+        labels_array[label_index] = current_instruction; // сохранили число типа C которое будет использовано в функции write_command
+
+        potential_error analayze_string_after_label_status = check_string_after_arg(end_pointer); 
+        /* вместо функции analyze_string_after_label , которая делает абсолютно ту же самую работу */
+
+        if (analayze_string_after_label_status == OK) {
+            PRINTF("после метки ничего нет, всё нормально");
+            GETCHAR();
+
+            return OK;
+        }
+
+        else { PRINTF("нашли что-то после метки, строка некорректная\n"); GETCHAR(); return INCORRECT_COMMAND_LINE; }
+    }
+
+    else if (*single_command_line == '\n') {
+        PRINTF("проскипав пробелы дошли до конца строки <=> строчка оказалась пустой\n");
+        GETCHAR();
+
+        return EMPTY_STRING;
+    }
+
+    else {
+        PRINTF("проскипав пробелы мы дошли до символа [%c], что : не является\n", *single_command_line);
+        GETCHAR();
+
+        return INCORRECT_COMMAND_LINE;
+    }
+}
+
+potential_error validate_string_length(char* buffer_in, int debug_index) {
+    PRINTF("[%d] debug_index\n");
+    GETCHAR();
+
+    if (buffer_in[debug_index] != '\n' && buffer_in[debug_index] != '\0') {
+        PRINTF("переполнение строки; debug_index: [%d]\n", debug_index);
+        GETCHAR();
+
+        return STRING_OVERFLOW;
+    }
+
+    else { return OK; }
+}
+
+uint32_t        pull_the_fucking_command(const char* single_command_line, int* command_length) {
+    char command_buffer[MAX_COMMAND_LEN] = {};
+    int  sscanf_result = sscanf(single_command_line, "%15s%n", command_buffer, command_length); // MAX_COMMAND_LEN - 1
+    // заведомо едим больше чем текущая максимальная длина команды
+    
+    if (sscanf_result == 1) { 
+        uint32_t hash_of_read_command = djb2_calculate_enum_hash(command_buffer);
+
+        return hash_of_read_command;
+    }
+
+    else { PRINTF("проблема со сканфом в функции pull_the_fucking_command"); return 0; }
+}
+
+void            clear_command_array(char* command) {
+    for (int i = 0; i < MAX_LINE; i++) {
         command[i] = 0;
     }
 }

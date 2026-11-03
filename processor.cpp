@@ -9,7 +9,7 @@
 
 #define REGS_AMOUNT       4
 #define BASIC_LENGTH      2 
-#define FUNCS_AMOUNT     23
+#define FUNCS_AMOUNT     21
 #define MAX_AMT_OF_DGTS 150 
 
 #define JMP_MACROS_INITIALIZE(func_name, mode_1, mode_2)   \
@@ -86,10 +86,16 @@ cpu_status            finish_instruction(cpu_struct* cpu, stack_potential_error 
 
 cmd_handler asm_funcs[FUNCS_AMOUNT] {
     /* первый логический блок */
+
     push_asm,
-    pushr_asm,
+    // pushr_asm, 
+    
+    /* удаляем две команды, поскольку мы делаем побитовые операции */
+    /* удаляем две команды, поскольку мы делаем побитовые операции */
+    /* удаляем две команды, поскольку мы делаем побитовые операции */
+    
     pop_asm,
-    popr_asm,
+    // popr_asm,
 
     /* второй логический блок */
     add_asm,

@@ -4,16 +4,9 @@
 
 #include "enum_djb.h"
 
-#define  MAX_LEN_FOR_SPACE 4
-
-#define  N_REGS (sizeof(reg_names) / sizeof(reg_names[0]))
-#define  N_CMDS (sizeof(commands) / sizeof(commands[0]))
-
 const char* const commands[] {
     "PUSH",
-    "PSHR",
     "POP",
-    "POPR",
     "ADD",
     "SUB",
     "MUL",
@@ -42,8 +35,15 @@ const char* const reg_names[] {
     "DX",
 };
 
-int  enums_header_generator(const char* filename_out);
-int  enums_hash_header_generator(const char* filename_out);
+const int n_regs = (sizeof(reg_names) / sizeof(reg_names[0]));
+const int n_cmds = (sizeof(commands) / sizeof(commands[0]));
+
+const int max_len_for_space      = 4;
+const int max_len_for_space_regs = 2;
+
+int   enums_header_generator(const char* filename_out);
+int   enums_hash_header_generator(const char* filename_out);
+void  print_hash_values(FILE* file_out, const char* const ptr_on_array[], const int array_length, const int space_aligment);
 
 int main() {
     const char* output_file = "generated_enums.h";
@@ -68,15 +68,15 @@ int enums_header_generator(const char* filename_out) {
 
         fprintf(file_out, "enum register_nums {\n");// это временное решение, мне оно нужно, пока я фикшу другие штуки
 
-        for (int i = 0; i < N_REGS; i++) { fprintf(file_out, "\t%s = %d,\n", reg_names[i], i + 1); }
+        for (int i = 0; i < n_regs; i++) { fprintf(file_out, "\t%s_ASM = %d,\n", reg_names[i], i + 1); }
 
         fprintf(file_out, "};\n\n");
         fprintf(file_out, "enum asm_commands_nums {\n");
         // проверка на долбаебушку тут отсутствует, т.к. это ведь мой файл с моими командами, проверка на дибилушку должна быть в ассемблере!
         int how_many_whitespaces = 0;
 
-        for (int array_index = 0; array_index < N_CMDS; array_index++) {
-            how_many_whitespaces = (int)(MAX_LEN_FOR_SPACE - strlen(commands[array_index]));
+        for (int array_index = 0; array_index < n_cmds; array_index++) {
+            how_many_whitespaces = (int)(max_len_for_space - strlen(commands[array_index]));
 
             printf("[%d] how many whitespaces\n", how_many_whitespaces);
             getchar();
@@ -103,25 +103,31 @@ int enums_hash_header_generator(const char* filename_out) {
 
     if (file_out != NULL) {
         fprintf(file_out, "enum commands_hash {\n");
-        int how_many_whitespaces = 0;
-        uint32_t calculated_hash = 0;
-
-        for (int array_index = 0; array_index < N_CMDS; array_index++) {
-            calculated_hash      = djb2_calculate_enum_hash(commands[array_index]);
-            how_many_whitespaces = (int)(MAX_LEN_FOR_SPACE - strlen(commands[array_index]));
-
-            printf("[%d] how many whitespaces\n", how_many_whitespaces);
-            getchar();
-
-            fprintf(file_out, "\t%s%*s = %u,\n", commands[array_index], how_many_whitespaces, "", calculated_hash);
-        }
-                
+        print_hash_values(file_out, commands, n_cmds, max_len_for_space);
         fprintf(file_out, "};\n\n");
+        
 
+        fprintf(file_out, "enum registers_hash {\n");
+        print_hash_values(file_out, reg_names, n_regs, max_len_for_space_regs);
+        fprintf(file_out, "};\n\n");
+        
         fclose(file_out);
 
         return 0;
     }
 
     else { return -1; }
+}
+
+void print_hash_values(FILE* file_out, const char* const ptr_on_array[], const int array_length, const int space_aligment) {
+    for (int array_index = 0; array_index < array_length; array_index++) {
+        uint32_t calculated_hash = djb2_calculate_enum_hash(ptr_on_array[array_index]);
+
+        int how_many_whitespaces = (int)(space_aligment - strlen(ptr_on_array[array_index]));
+
+        printf("[%d] how many whitespaces\n", how_many_whitespaces);
+        getchar();
+
+        fprintf(file_out, "\t%s%*s = %u,\n", ptr_on_array[array_index], how_many_whitespaces, "", calculated_hash);
+    }
 }
