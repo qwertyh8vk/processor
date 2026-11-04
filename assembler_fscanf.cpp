@@ -1,7 +1,7 @@
 #include "assembler_fscanf.h"
 #include "enum_djb.h"
 
-int main() {
+int             main() {
 
     // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // //
     // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // //
@@ -9,56 +9,49 @@ int main() {
     // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // //
     // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // //
 
-    const char*    to_be_assemblered                 = "assembler.txt"; // пока что .txt, потом сделаем бинарщину
+    const char*    to_be_assemblered                 = "assembler.txt";
     const char*    assemblered_file                  = "assembler_res.txt";
     const char*    assemblered_file_after_first_asm  = "assembler_res_after_first.txt";
 
     struct stat    to_be_assemblered_struct;
 
-    char*          file_buffer  = initialize_file_buffer(to_be_assemblered, &to_be_assemblered_struct);
-    uint8_t* bytecode     = (uint8_t *)calloc(to_be_assemblered_struct.st_size + 1, sizeof(char));
+    char*          file_buffer       = initialize_file_buffer(to_be_assemblered, &to_be_assemblered_struct);
+    long long      bytecode_capacity = to_be_assemblered_struct.st_size + 1;
+    uint8_t*       bytecode          = (uint8_t *)calloc(bytecode_capacity, sizeof(char));
     
     bytecode[to_be_assemblered_struct.st_size] = '\0';
 
     if (file_buffer != NULL) {
         potential_error error_after_load = load_file_buffer(to_be_assemblered, file_buffer, to_be_assemblered_struct.st_size);
         if (error_after_load != OK) { return error_after_load; }
-        for (off_t i = 0; i < to_be_assemblered_struct.st_size + 1; i++) {
-            if (file_buffer[i] == '\n') {
-                printf("[\\");
-                printf("n] ");
-            }
-
-            else if (file_buffer[i] == '\0') {
-                printf("[\\");
-                printf("0] ");
-            }
-
-            else { printf("[%c] ", file_buffer[i]); }
-        }
-        printf("\n");
+        debugger_like_printf(file_buffer, &to_be_assemblered_struct);
     }
 
-    // potential_error obrabotka_faila_status = obrabotka_faila(to_be_assemblered, assemblered_file, assemblered_file_after_first_asm);
-    
-    return OK;
+    potential_error obrabotka_faila_status = obrabotka_faila(file_buffer, bytecode, assemblered_file_after_first_asm, bytecode_capacity);
+   
+    for (off_t i = 0; i < bytecode_capacity; i++) {
+        printf("<%u> ", bytecode[i]);
+    }
+    printf("\n");
+
+    return obrabotka_faila_status;
 }
 
-potential_error obrabotka_faila(char* file_buffer,  char* bytecode, const char* filename_out_after_first_asm) {
+potential_error obrabotka_faila(char* file_buffer,  uint8_t* bytecode, const char* filename_out_after_first_asm, long long bytecode_capacity) {
     long long labels_array[MAX_LABELS_AMOUNT] = {0};
 
-    for (int i = 0; i < MAX_LABELS_AMOUNT; i++) {
-        labels_array[i] = -1;
-    }
+    for (int i = 0; i < MAX_LABELS_AMOUNT; i++) { labels_array[i] = -1; }
 
     size_t          commands_and_arguments_counted = 0;
-    potential_error assemble_file_stage_1 = assemble_file_second(file_buffer, bytecode, labels_array, FIRST, &commands_and_arguments_counted);
+    potential_error assemble_file_stage_1 = assemble_file_second(file_buffer, bytecode, labels_array, FIRST, &commands_and_arguments_counted, bytecode_capacity);
+
     PRINTF("Ошибка после первого ассембла: [%d]\n", assemble_file_stage_1);
     GETCHAR();
     PRINTF("Количество прочитанных символов: [%zu]\n", commands_and_arguments_counted);
     GETCHAR(); 
 
-    potential_error assemble_file_stage_2 = assemble_file_second(file_buffer, bytecode, labels_array, SECOND, &commands_and_arguments_counted);
+    potential_error assemble_file_stage_2 = assemble_file_second(file_buffer, bytecode, labels_array, SECOND, &commands_and_arguments_counted, bytecode_capacity);
+
     PRINTF("Ошибка после второго ассембла: [%d]\n", assemble_file_stage_2);
     GETCHAR();
 
@@ -120,7 +113,8 @@ potential_error load_file_buffer(const char* filename, char* file_buffer, off_t 
 }
 
 potential_error assemble_file_second(char*        buffer_in,    uint8_t* bytecode, long long* labels_array, 
-                                     progon_index progon_index, size_t*        commands_and_arguments_counted) 
+                                     progon_index progon_index, size_t*  commands_and_arguments_counted, 
+                                     long long    bytecode_capacity) 
 {
     assert(buffer_in);
     assert(bytecode);
@@ -143,27 +137,39 @@ potential_error assemble_file_second(char*        buffer_in,    uint8_t* bytecod
         potential_error check_length_status = validate_string_length(buffer_in, debug_index);
 
         if (check_length_status == OK) {
+            PRINTF("ДЕБАГ ИНДЕКС: <%d>\n", debug_index);
+            GETCHAR();
             debug_index += 1; // перешагнули через \n
             buffer_in   += debug_index;
 
-            PRINTF("assemble_file_second||buffer_in||ГДЕ Я: [%s], [%c]", buffer_in, *buffer_in);
+            PRINTF("assemble_file_second ||\nbuffer_in ||\nГДЕ Я:\n<%s>, <%c>\n", buffer_in, *buffer_in);
             GETCHAR();
             // 1 шаг выполнили
 
             int      command_length = 0;
             uint32_t command_hash   = pull_the_fucking_command(single_command_line, &command_length);
+            PRINTF("<%d> command_length\n", command_length);
             // 2 шаг выполнили . вытащили команду
 
             // индекс сдвинутый на длину команды (ничего более)
-            char* command_line_ptr                   = single_command_line + command_length; 
+            char* command_line_ptr                   = single_command_line + command_length;
+            PRINTF("assemble_file_second: <%s> single_command_line\n", single_command_line);
+            GETCHAR(); 
+            PRINTF("assemble_file_second: <%s> command_line_ptr\n", command_line_ptr);
+            GETCHAR();
             potential_error process_command_status   = process_command_byhash(command_hash,          single_command_line, 
                                                                               command_line_ptr,      labels_array, 
-                                                                              &instruction_pointer,  bytecode);
+                                                                              &instruction_pointer,  bytecode, 
+                                                                              bytecode_capacity);
+             
+            PRINTF("process_command_status: <%d>\n", process_command_status);
+            GETCHAR();
             if (process_command_status == OK) {
                 PRINTF("команда успешно обработалась\n");
                 GETCHAR();
-
             }
+
+            else { return process_command_status; }
         }
 
         clear_command_array(single_command_line);
@@ -177,11 +183,12 @@ potential_error assemble_file_second(char*        buffer_in,    uint8_t* bytecod
 
 potential_error process_command_byhash(uint32_t      command_hash,         char*           single_command_line, 
                                         char*        command_line_ptr,     long long*      labels_array,
-                                        long long*   instruction_pointer,  uint8_t*        bytecode) {
+                                        long long*   instruction_pointer,  uint8_t*        bytecode, 
+                                        long long    bytecode_capacity) {
     switch (command_hash) {
 
-        MACROS_PROCESS_PUSH_POP_BY_HASH(PUSH, function);
-        MACROS_PROCESS_PUSH_POP_BY_HASH(POP,  function);
+        MACROS_PROCESS_PUSH_POP_BY_HASH(PUSH);
+        MACROS_PROCESS_PUSH_POP_BY_HASH(POP);
 
         MACROS_PROCESS_ZERO_OPERAND_BY_HASH(ADD);
         MACROS_PROCESS_ZERO_OPERAND_BY_HASH(SUB);
@@ -205,145 +212,128 @@ potential_error process_command_byhash(uint32_t      command_hash,         char*
         MACROS_PROCESS_LABEL_COMMANDS_BY_HASH(CALL);
         
         MACROS_DEFAULT_SITUATION();
-    
+        
     }
+
+    return OK;
 }
 
-potential_error validate_push_command(char*              command_line_ptr, 
-                                      asm_commands_nums  func_asm_code, 
-                                      uint8_t*           bytecode,
-                                      long long*         instruction_pointer) 
+
+potential_error write_operand(asm_commands_nums func_asm_code,
+                              uint8_t                   flags,
+                              register_nums               reg,
+                              STACK_DATA_TYPE          chislo,
+                              uint8_t*               bytecode,
+                              long long*  instruction_pointer,
+                              long long     bytecode_capacity)
 {
-    PRINTF("на каком мы сейчас символе: [%c], [%s]\n", *command_line_ptr, command_line_ptr);
-    GETCHAR();
+    uint8_t func_asm_code_uint = (uint8_t)func_asm_code;
 
-    STACK_DATA_TYPE chislo                = 0;
-    char reg[MAX_COMMAND_LEN]             = {};
-    int  debug_index                      = 0;
-    register_nums reg_enum = (register_nums)0;
+    func_asm_code_uint = func_asm_code_uint | flags;
 
-    if      (sscanf(command_line_ptr, "%lf%n", &chislo, &debug_index) == 1) 
-    {
-        PRINTF("считавшееся число: [%lf]\n", chislo);
+    if ((*instruction_pointer < bytecode_capacity) && (bytecode_capacity - *instruction_pointer > sizeof(uint8_t))) {
+        memcpy(bytecode + *instruction_pointer, &func_asm_code_uint, sizeof(uint8_t));
+        *instruction_pointer += sizeof(uint8_t);
+    }
+
+    else { PRINTF("попытка записать func_asm_code_uint: недостаточно места\n"); GETCHAR(); return BYTECODE_OVERFLOW; }
+
+    if (flags & REGISTER_BIT) {
+        PRINTF("Мы попали в регистер бит\n");
         GETCHAR();
 
-        reg_enum = determine_register(reg);
-        if (reg_enum < 0) { PRINTF("нераспозннаный регистр!\n"); return INCORRECT_REG; }
-
-        uint8_t func_asm_code_uint = (uint8_t)func_asm_code;
-        func_asm_code_uint = func_asm_code_uint | CONST_BIT;
-
-        *(bytecode + *instruction_pointer) = func_asm_code_uint;
-        *instruction_pointer += sizeof(uint8_t);
-
-        *(STACK_DATA_TYPE *)(bytecode + *instruction_pointer) = chislo;
-        *instruction_pointer += sizeof(STACK_DATA_TYPE);
-    } // push 123
-
-    else if (sscanf(command_line_ptr, "%lf + %15s%n", &chislo, reg, &debug_index) == 2 || 
-             sscanf(command_line_ptr, "%15s + %lf%n", reg, &chislo, &debug_index) == 2) 
-    {
-        PRINTF("считавшееся число и регистр: [%lf] и [%s]\n", chislo, reg);
-        GETCHAR();
-
-        reg_enum = determine_register(reg);
-        if (reg_enum < 0) { PRINTF("нераспозннаный регистр!\n"); return INCORRECT_REG; }
-
-        uint8_t func_asm_code_uint = (uint8_t)func_asm_code;
-        uint8_t reg_enum_uint      = (uint8_t)reg_enum;
-
-        func_asm_code_uint = func_asm_code_uint | CONST_BIT | REGISTER_BIT;
-
-        *(bytecode + *instruction_pointer) = func_asm_code_uint;
-        *instruction_pointer += sizeof(uint8_t);
-
-        *(STACK_DATA_TYPE *)(bytecode + *instruction_pointer) = chislo;
-        *instruction_pointer += sizeof(STACK_DATA_TYPE);
-
-        *(bytecode + *instruction_pointer) = reg_enum_uint;
-        *instruction_pointer += sizeof(uint8_t);
-    } // push 123 + ax или //push ax + 123
-
-    else if (sscanf(command_line_ptr, "%15s%n", reg, &debug_index) == 1) {
-        PRINTF("считавшийся регистр: [%s]\n", reg);
-        GETCHAR();
-
-        reg_enum = determine_register(reg);
-        if (reg_enum < 0) { PRINTF("нераспозннаный регистр!\n"); return INCORRECT_REG; }
-
-        uint8_t func_asm_code_uint = (uint8_t)func_asm_code;
-        uint8_t reg_enum_uint      = (uint8_t)reg_enum;
-
-        func_asm_code_uint = func_asm_code_uint | REGISTER_BIT;
-
-        *(bytecode + *instruction_pointer) = func_asm_code_uint;
-        *instruction_pointer += sizeof(uint8_t);
-
-        *(bytecode + *instruction_pointer) = reg_enum_uint;
-        *instruction_pointer += sizeof(uint8_t);
-    } // push ax
-
-    else if (sscanf(command_line_ptr, "[%15[^ ] + %lf]%n", reg, &chislo, &debug_index) == 2 ||
-             sscanf(command_line_ptr, "[%lf + %15[^ ]]%n", chislo, &reg, &debug_index) == 2 )
-    {
-        PRINTF("считавшиеся число и регистр: [%lf] и [%s]\n", chislo, reg);
-        GETCHAR();
-
-        reg_enum = determine_register(reg);
-        if (reg_enum < 0) { PRINTF("нераспозннаный регистр!\n"); return INCORRECT_REG; }
-
-        uint8_t func_asm_code_uint = (uint8_t)func_asm_code;
-        uint8_t reg_enum_uint      = (uint8_t)reg_enum;
+        uint8_t reg_enum_uint  = (uint8_t)reg;
         
-        func_asm_code_uint = func_asm_code_uint | CONST_BIT | MEMORY_BIT | REGISTER_BIT;
+        if ((*instruction_pointer < bytecode_capacity) && (bytecode_capacity - *instruction_pointer > sizeof(uint8_t))) {
+            memcpy(bytecode + *instruction_pointer, &reg_enum_uint, sizeof(uint8_t));
+            *instruction_pointer += sizeof(uint8_t);
+        }
 
-        *(bytecode + *instruction_pointer) = func_asm_code_uint;
-        *instruction_pointer += sizeof(uint8_t);
+        else { PRINTF("попытка записать reg_enum_uint: недостаточно места\n"); GETCHAR(); return BYTECODE_OVERFLOW; }
+    }
 
-        *(STACK_DATA_TYPE *)(bytecode + *instruction_pointer) = chislo;
-        *instruction_pointer += sizeof(STACK_DATA_TYPE);
-
-        *(bytecode + *instruction_pointer) = reg_enum_uint;
-        *instruction_pointer += sizeof(uint8_t);
-
-    } // push [ax + 123] push [123 + ax]
-
-    else if (sscanf(command_line_ptr, "[%lf]%n", &chislo, &debug_index) == 1)
-    {
-        PRINTF("считавшееся число: [%lf]\n", chislo);
+    if (flags & CONST_BIT) {
+        PRINTF("Мы попали в конст бит\n");
         GETCHAR();
+
+        if ((*instruction_pointer < bytecode_capacity) && (bytecode_capacity - *instruction_pointer > sizeof(STACK_DATA_TYPE))) {
+            memcpy(bytecode + *instruction_pointer, &chislo, sizeof(STACK_DATA_TYPE));
+            *instruction_pointer += sizeof(STACK_DATA_TYPE);
+        }
         
-        uint8_t func_asm_code_uint = (uint8_t)func_asm_code;
-        func_asm_code_uint = func_asm_code_uint | CONST_BIT | MEMORY_BIT;
+        else { PRINTF("попытка записать chislo: недостаточно места\n"); GETCHAR(); return BYTECODE_OVERFLOW; }
+    }
 
-        *(bytecode + *instruction_pointer) = func_asm_code_uint;
-        *instruction_pointer += sizeof(uint8_t);
+    return OK;
+}
 
-        *(STACK_DATA_TYPE *)(bytecode + *instruction_pointer) = chislo;
-        *instruction_pointer += sizeof(STACK_DATA_TYPE);
+potential_error parse_operand_push_pop(char*               command_line_ptr, 
+                                       operand_data*  ptr_on_operand_struct, 
+                                       int*                     debug_index,
+                                       asm_commands_nums      func_asm_code) 
+{
+    char reg[MAX_COMMAND_LEN] = {};
+    int  register_flag        = 0;
+    char char_for_pop         = 0;
 
-    } // push [ax + 123] push [123 + ax]
-
-    else if (sscanf(command_line_ptr, "[%15s]%n", reg, &debug_index) == 1)
+    if (sscanf(command_line_ptr, " [%15[^ ] + %lf]%n", reg, &(ptr_on_operand_struct->number), debug_index) == 2 ||
+        sscanf(command_line_ptr, " [%lf + %15[^]]]%n", &(ptr_on_operand_struct->number), reg, debug_index) == 2 ) 
     {
-        PRINTF("считавшийся регистр: [%s]\n", chislo, reg);
+        PRINTF("считавшиеся число и регистр: <%lf> и <%s>\n", ptr_on_operand_struct->number, reg);
         GETCHAR();
-
-        reg_enum = determine_register(reg);
-        if (reg_enum < 0) { PRINTF("нераспозннаный регистр!\n"); return INCORRECT_REG; }
-
-        uint8_t func_asm_code_uint = (uint8_t)func_asm_code;
-        uint8_t reg_enum_uint      = (uint8_t)reg_enum;
-
-        func_asm_code_uint = func_asm_code_uint | MEMORY_BIT | REGISTER_BIT;
-
-        *(bytecode + *instruction_pointer) = func_asm_code_uint;
-        *instruction_pointer += sizeof(uint8_t);
-
-        *(bytecode + *instruction_pointer) = reg_enum_uint;
-        *instruction_pointer += sizeof(uint8_t);
-
+        ptr_on_operand_struct->flags = MEMORY_BIT | CONST_BIT | REGISTER_BIT;
+        register_flag++;
     } 
+
+    else if (sscanf(command_line_ptr, " [%lf]%n", &(ptr_on_operand_struct->number), debug_index) == 1) {
+        PRINTF("считавшееся число: <%lf>\n", ptr_on_operand_struct->number);
+        GETCHAR();
+        ptr_on_operand_struct->flags = MEMORY_BIT | CONST_BIT;
+    }
+
+    else if (sscanf(command_line_ptr, " [%15[^]]]%n", reg, debug_index) == 1) {
+        PRINTF("считавшийся регистр (1): <%s>\n", reg);
+        GETCHAR();
+        ptr_on_operand_struct->flags = MEMORY_BIT | REGISTER_BIT;
+        register_flag++;
+    } 
+
+    else if (sscanf(command_line_ptr, "%lf + %15s%n", &(ptr_on_operand_struct->number), reg, debug_index) == 2 || 
+             sscanf(command_line_ptr, "%15s + %lf%n", reg, &(ptr_on_operand_struct->number), debug_index) == 2) 
+    {
+        if (func_asm_code == PUSH_ASM) {
+            PRINTF("считавшееся число и регистр: <%lf> и <%s>\n", ptr_on_operand_struct->number, reg);
+            GETCHAR();
+            ptr_on_operand_struct->flags = CONST_BIT | REGISTER_BIT;
+            register_flag++;
+        }
+
+        else { PRINTF("недопустимый операнд (регистр + константа для попа)\n"); return INCORRECT_COMMAND_LINE; }
+    } 
+
+    else if (sscanf(command_line_ptr, "%15s%n", reg, debug_index) == 1) {
+        PRINTF("считавшийся регистр (2): %s\n", reg);
+        GETCHAR();
+        ptr_on_operand_struct->flags = REGISTER_BIT;
+        register_flag++;
+    } 
+
+    else if (sscanf(command_line_ptr, "%lf%n", &(ptr_on_operand_struct->number), debug_index) == 1) {
+        if (func_asm_code == PUSH_ASM) {
+            PRINTF("считавшееся число: <%lf>\n", ptr_on_operand_struct->number);
+            GETCHAR();
+            ptr_on_operand_struct->flags = CONST_BIT;
+            register_flag++;
+        }
+
+        else { PRINTF("недопустимый операнд (константа для попа)\n"); return INCORRECT_COMMAND_LINE; }
+    } 
+    
+    else if ((sscanf(command_line_ptr, "%c", &char_for_pop) == 1) && char_for_pop == '\n') {
+        if (func_asm_code == POP_ASM) { ; }
+
+        else { PRINTF("недопустимый операнд (пусто для пуша)\n"); return INCORRECT_COMMAND_LINE; }
+    }
 
     else {
         PRINTF("нераспознанный формат ввода после push/pop'a\n");
@@ -352,20 +342,56 @@ potential_error validate_push_command(char*              command_line_ptr,
         return INCORRECT_COMMAND_LINE;
     }
 
-    char* pointer_on_str_after_args = command_line_ptr + debug_index;
+    if (register_flag != 0) {
+        register_nums reg_enum = determine_register(reg);
+        if (reg_enum < 0) { PRINTF("некорректный (нераспознанный) регистр.\n"); return INCORRECT_REG; }
+        ptr_on_operand_struct->reg = reg_enum;
+    }
 
-    PRINTF("на каком мы сейчас символе: [%c], [%s]\n", *pointer_on_str_after_args, pointer_on_str_after_args);
+    return OK;
+}
+
+potential_error validate_push_pop_command(char*              command_line_ptr, 
+                                          asm_commands_nums  func_asm_code, 
+                                          uint8_t*           bytecode,
+                                          long long*         instruction_pointer,
+                                          long long          bytecode_capacity) 
+{
+    PRINTF("validate_push_pop_command (1)\nна каком мы сейчас символе: [%c], [%s]\n", *command_line_ptr, command_line_ptr);
     GETCHAR();
 
-    potential_error check_string_after_arg_status = check_string_after_arg(pointer_on_str_after_args);
+    operand_data operand_data_struct = {};
+    int debug_index = 0;
 
-    if (check_string_after_arg_status == OK) {
-        
+    potential_error parse_operand_status = parse_operand_push_pop(command_line_ptr, &operand_data_struct, &debug_index, func_asm_code);
+    if (parse_operand_status == OK) {
+        char* pointer_on_str_after_args = command_line_ptr + debug_index;
+
+        PRINTF("<%s>\n", command_line_ptr);
+          
+        PRINTF("ДЕБАГ ИНДЕКС ПЕРЕД ВЕЛИДЕЙТОМ: <%d>\n", debug_index);
+        PRINTF("validate_push_pop_command (2)\nна каком мы сейчас символе: <%c>, <%s>\n", *pointer_on_str_after_args, pointer_on_str_after_args);
+        GETCHAR();
+
+        potential_error check_string_after_arg_status = check_string_after_arg(pointer_on_str_after_args);
+
+        if (check_string_after_arg_status == OK) {
+            PRINTF("вот вот сделаю write operand\n");
+            GETCHAR();
+
+            potential_error write_operand_status = write_operand(func_asm_code,           operand_data_struct.flags, 
+                                                                 operand_data_struct.reg, operand_data_struct.number, 
+                                                                 bytecode,                instruction_pointer, 
+                                                                 bytecode_capacity);
+
+            PRINTF("<%d> write operand status\n", write_operand_status);
+            return write_operand_status;
+        }
+
+        else { return check_string_after_arg_status; }
     }
 
-    else {
-
-    }
+    else { return parse_operand_status; }
 }
 
 register_nums   determine_register(char* reg) {
@@ -399,24 +425,27 @@ register_nums   determine_register(char* reg) {
 potential_error validate_zero_operands_commands(char*              command_line_ptr, 
                                                 asm_commands_nums  func_asm_code, 
                                                 uint8_t*           bytecode,
-                                                long long*         instruction_pointer) 
+                                                long long*         instruction_pointer,
+                                                long long          bytecode_capacity) 
 {
-    PRINTF("на каком мы сейчас символе: [%c], [%s]\n", *command_line_ptr, command_line_ptr);
+    PRINTF("validate_zero_operands_commands (1)\nна каком мы сейчас символе: [%c], [%s]\n", *command_line_ptr, command_line_ptr);
     GETCHAR();
 
     while (*command_line_ptr == ' ') {
         command_line_ptr++;
     }
 
-    if (*command_line_ptr == '\n') {
-        PRINTF("проскипав пробелы мы дошли до слэш n, всё в порядке\n");
+    if (*command_line_ptr == '\0') {
+        PRINTF("проскипав пробелы мы дошли до слеш0, всё в порядке\n");
         GETCHAR();
 
-        bytecode[*instruction_pointer] = (uint8_t)func_asm_code;
-        *instruction_pointer          += sizeof(uint8_t);
+        operand_data operand_data_struct = {};
 
-        return OK;
-    
+        potential_error write_operand_status = write_operand(func_asm_code,                 operand_data_struct.flags, 
+                                                             operand_data_struct.reg,       operand_data_struct.number, 
+                                                             bytecode, instruction_pointer, bytecode_capacity);
+
+        return write_operand_status;    
     }
     
     else {
@@ -428,22 +457,23 @@ potential_error validate_zero_operands_commands(char*              command_line_
 }
 
 potential_error check_string_after_arg(char* command_line_ptr) {
-    PRINTF("на каком мы сейчас символе: [%c], [%s]\n", *command_line_ptr, command_line_ptr);
+    PRINTF("check_string_after_arg (1)\nна каком мы сейчас символе: [%c], [%s]\n", *command_line_ptr, command_line_ptr);
     GETCHAR();
 
     while (*command_line_ptr == ' ') { command_line_ptr++; }
 
-    if (*command_line_ptr == '\n')   { return OK; }
+    if (*command_line_ptr == '\0')   { return OK; }
     else                             { return INCORRECT_COMMAND_LINE; }
 }
 
 potential_error validate_commands_only_labels(char*             command_line_ptr, 
-                                                long long*        labels_array, 
-                                                asm_commands_nums func_asm_code,
-                                                uint8_t*          bytecode,
-                                                long long*        instruction_pointer) 
+                                              long long*        labels_array, 
+                                              asm_commands_nums func_asm_code,
+                                              uint8_t*          bytecode,
+                                              long long*        instruction_pointer,
+                                              long long         bytecode_capacity) 
 {
-    PRINTF("на каком мы сейчас символе: [%c], [%s]\n", *command_line_ptr, command_line_ptr);
+    PRINTF("validate_commands_only_labels (1)\nна каком мы сейчас символе: [%c], [%s]\n", *command_line_ptr, command_line_ptr);
     GETCHAR();
     
     while (*command_line_ptr == ' ') {
@@ -466,27 +496,24 @@ potential_error validate_commands_only_labels(char*             command_line_ptr
         }
 
         PRINTF("[%lld] число которое мы сохранили\n", label_index);
-        GETCHAR(); // JMP  :102saas
+        GETCHAR();
 
-        long long current_instruction_to_jump  = labels_array[label_index]; // сохранили число типа C которое будет использовано в функции write_command
-
+        long long current_instruction_to_jump  = labels_array[label_index];
         potential_error analayze_string_after_label_status = check_string_after_arg(end_pointer); 
-        /* вместо функции analyze_string_after_label , которая делает абсолютно ту же самую работу */
 
         if (analayze_string_after_label_status == OK) {
             PRINTF("после числа ничего нет, всё нормально");
             GETCHAR();
-
-            uint8_t func_asm_code_uint = (uint8_t)func_asm_code;
-            func_asm_code_uint = func_asm_code_uint | CONST_BIT;
-
-            *(bytecode + *instruction_pointer) = func_asm_code_uint;
-            *instruction_pointer += sizeof(uint8_t);
             
-            *(long long *)(bytecode + *instruction_pointer) = current_instruction_to_jump;
-            *instruction_pointer += sizeof(long long);
+            operand_data operand_data_struct = {};
+            operand_data_struct.number       = (STACK_DATA_TYPE)current_instruction_to_jump;
+            operand_data_struct.flags        = CONST_BIT;
 
-            return OK;
+            potential_error write_operand_status = write_operand(func_asm_code,                 operand_data_struct.flags, 
+                                                                 operand_data_struct.reg,       operand_data_struct.number, 
+                                                                 bytecode, instruction_pointer, bytecode_capacity);
+
+            return write_operand_status;
         }
 
         else { PRINTF("нашли что-то после числа, строка некорректная\n"); GETCHAR(); return INCORRECT_COMMAND_LINE; }
@@ -508,8 +535,8 @@ potential_error validate_commands_only_labels(char*             command_line_ptr
 }
 
 potential_error validate_labels_and_else(char*      single_command_line, 
-                                           long long* labels_array, 
-                                           long long  current_instruction) 
+                                         long long* labels_array, 
+                                         long long  current_instruction) 
 {
     PRINTF("Где я: [%s], [%c]", single_command_line, *single_command_line);
     GETCHAR();
@@ -563,10 +590,10 @@ potential_error validate_labels_and_else(char*      single_command_line,
 }
 
 potential_error validate_string_length(char* buffer_in, int debug_index) {
-    PRINTF("[%d] debug_index\n");
+    PRINTF("[%d] debug_index\n", debug_index);
     GETCHAR();
 
-    if (buffer_in[debug_index] != '\n' && buffer_in[debug_index] != '\0') {
+    if (debug_index >= MAX_LINE && buffer_in[debug_index] != '\n' && buffer_in[debug_index] != '\0') {
         PRINTF("переполнение строки; debug_index: [%d]\n", debug_index);
         GETCHAR();
 
@@ -594,4 +621,21 @@ void            clear_command_array(char* command) {
     for (int i = 0; i < MAX_LINE; i++) {
         command[i] = 0;
     }
+}
+
+void            debugger_like_printf(char* file_buffer, struct stat* to_be_assemblered_struct) {
+    for (off_t i = 0; i < to_be_assemblered_struct->st_size + 1; i++) {
+        if (file_buffer[i] == '\n') {
+            printf("[\\");
+            printf("n] ");
+        }
+
+        else if (file_buffer[i] == '\0') {
+            printf("[\\");
+            printf("0] ");
+        }
+
+        else { printf("[%c] ", file_buffer[i]); }
+    }
+    printf("\n");
 }
