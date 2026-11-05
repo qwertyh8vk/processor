@@ -63,7 +63,6 @@
 #define MEMORY_BIT   (0b10000000)
 #define REGISTER_BIT (0b01000000)
 #define CONST_BIT    (0b00100000)
-#define OPCODE_MASK  (0x1Fu)
 
 #define MAX_LABELS_AMOUNT 128
 #define MAX_LINE          256
@@ -105,6 +104,7 @@ enum potential_error  {
     EMPTY_STRING           = 13,
     INCORRECT_REG          = 14,
     BYTECODE_OVERFLOW      = 15,
+    REALLOC_FAILED         = 16,
 }; 
 
 #include "generated_enums.h"
@@ -115,28 +115,29 @@ typedef struct {
     STACK_DATA_TYPE         number;
 } operand_data;
 
-potential_error obrabotka_faila(char* file_buffer,  uint8_t* bytecode, 
-                                const char* filename_out_after_first_asm, long long bytecode_capacity);
+potential_error obrabotka_faila(char*      file_buffer,       uint8_t** bytecode, const char* exit_filename,
+                                long long* bytecode_capacity, long long file_buffer_size);
 
 char*           initialize_file_buffer(const char* filename, struct stat* file_buffer_struct); 
+
 potential_error load_file_buffer(const char* filename, char* file_buffer, off_t struct_size);
 
-potential_error assemble_file_second(char*        buffer_in,    uint8_t* bytecode, long long* labels_array, 
-                                     progon_index progon_index, size_t*  commands_and_arguments_counted, 
-                                     long long    bytecode_capacity);
+potential_error assemble_file_second(char*         buffer_in,         uint8_t** bytecode, long long* labels_array, 
+                                     progon_index  progon_index,      size_t*   commands_and_arguments_counted, 
+                                     long long*    bytecode_capacity, long long file_buffer_size);
 
-potential_error process_command_byhash(uint32_t      command_hash,         char*           single_command_line, 
-                                        char*        command_line_ptr,     long long*      labels_array,
-                                        long long*   instruction_pointer,  uint8_t*        bytecode, 
-                                        long long    bytecode_capacity);
+potential_error process_command_byhash(uint32_t       command_hash,         char*           single_command_line, 
+                                        char*         command_line_ptr,     long long*      labels_array,
+                                        long long*    instruction_pointer,  uint8_t**       bytecode, 
+                                        long long*    bytecode_capacity);
 
 potential_error write_operand(asm_commands_nums func_asm_code,
                               uint8_t                   flags,
                               register_nums               reg,
                               STACK_DATA_TYPE          chislo,
-                              uint8_t*               bytecode,
+                              uint8_t**              bytecode,
                               long long*  instruction_pointer,
-                              long long     bytecode_capacity);
+                              long long*    bytecode_capacity);
 
 potential_error parse_operand_push_pop(char*               command_line_ptr, 
                                        operand_data*  ptr_on_operand_struct, 
@@ -145,32 +146,41 @@ potential_error parse_operand_push_pop(char*               command_line_ptr,
 
 potential_error validate_push_pop_command(char*              command_line_ptr, 
                                           asm_commands_nums  func_asm_code, 
-                                          uint8_t*           bytecode,
+                                          uint8_t**          bytecode,
                                           long long*         instruction_pointer,
-                                          long long          bytecode_capacity);
+                                          long long*         bytecode_capacity);
 
 register_nums   determine_register(char* reg);
 
 potential_error validate_zero_operands_commands(char*              command_line_ptr, 
                                                 asm_commands_nums  func_asm_code, 
-                                                uint8_t*           bytecode,
+                                                uint8_t**          bytecode,
                                                 long long*         instruction_pointer,
-                                                long long          bytecode_capacity); 
+                                                long long*         bytecode_capacity); 
 
 potential_error check_string_after_arg(char* command_line_ptr); 
 
-potential_error validate_commands_only_labels(char*             command_line_ptr, 
-                                              long long*        labels_array, 
-                                              asm_commands_nums func_asm_code,
-                                              uint8_t*          bytecode,
-                                              long long*        instruction_pointer,
-                                              long long         bytecode_capacity);
+potential_error validate_commands_only_labels(char*              command_line_ptr, 
+                                              long long*         labels_array, 
+                                              asm_commands_nums  func_asm_code,
+                                              uint8_t**          bytecode,
+                                              long long*         instruction_pointer,
+                                              long long*         bytecode_capacity);
 
-potential_error validate_labels_and_else(char*      single_command_line, 
-                                         long long* labels_array, 
-                                         long long  current_instruction);      
+potential_error validate_labels_and_else(char*       single_command_line, 
+                                         long long*  labels_array, 
+                                         long long   current_instruction);   
+
+potential_error recalloc(uint8_t** bytecode, long long* bytecode_capacity);
 
 potential_error validate_string_length(char* buffer_in, int debug_index);
+
+potential_error write_bytecode_in_binary(const char* exit_filename, uint8_t* bytecode, long long valuable_bytes);
+
 uint32_t        pull_the_fucking_command(const char* single_command_line, int* command_length);
+
 void            clear_command_array(char* command);
+
 void            debugger_like_printf(char* file_buffer, struct stat* to_be_assemblered_struct);
+
+void            zero_after_calloc(uint8_t* bytecode, long long start_ptr, long long end_ptr);

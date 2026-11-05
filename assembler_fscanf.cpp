@@ -1,6 +1,10 @@
 #include "assembler_fscanf.h"
 #include "enum_djb.h"
 
+
+//TODO - assert
+//TODO - recalloc
+
 int             main() {
 
     // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // //
@@ -9,25 +13,22 @@ int             main() {
     // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // //
     // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // //
 
-    const char*    to_be_assemblered                 = "assembler.txt";
-    const char*    assemblered_file                  = "assembler_res.txt";
-    const char*    assemblered_file_after_first_asm  = "assembler_res_after_first.txt";
+    const char*    to_be_assemblered = "assembler.txt";
+    const char*    assemblered_file  = "assembler_res.bin";
 
     struct stat    to_be_assemblered_struct;
 
     char*          file_buffer       = initialize_file_buffer(to_be_assemblered, &to_be_assemblered_struct);
-    long long      bytecode_capacity = to_be_assemblered_struct.st_size + 1;
+    long long      bytecode_capacity = to_be_assemblered_struct.st_size;
     uint8_t*       bytecode          = (uint8_t *)calloc(bytecode_capacity, sizeof(char));
-    
-    bytecode[to_be_assemblered_struct.st_size] = '\0';
 
     if (file_buffer != NULL) {
-        potential_error error_after_load = load_file_buffer(to_be_assemblered, file_buffer, to_be_assemblered_struct.st_size);
+        potential_error error_after_load = load_file_buffer(to_be_assemblered, file_buffer, bytecode_capacity + 1);
         if (error_after_load != OK) { return error_after_load; }
         debugger_like_printf(file_buffer, &to_be_assemblered_struct);
     }
 
-    potential_error obrabotka_faila_status = obrabotka_faila(file_buffer, bytecode, assemblered_file_after_first_asm, bytecode_capacity);
+    potential_error obrabotka_faila_status = obrabotka_faila(file_buffer, &bytecode, assemblered_file, &bytecode_capacity, bytecode_capacity + 1);
    
     for (off_t i = 0; i < bytecode_capacity; i++) {
         printf("<%u> ", bytecode[i]);
@@ -37,29 +38,39 @@ int             main() {
     return obrabotka_faila_status;
 }
 
-potential_error obrabotka_faila(char* file_buffer,  uint8_t* bytecode, const char* filename_out_after_first_asm, long long bytecode_capacity) {
+potential_error obrabotka_faila(char*      file_buffer,       uint8_t** bytecode, const char* exit_filename,
+                                long long* bytecode_capacity, long long file_buffer_size) {
+
+    assert(file_buffer && bytecode && exit_filename && bytecode_capacity);                              
+
     long long labels_array[MAX_LABELS_AMOUNT] = {0};
 
     for (int i = 0; i < MAX_LABELS_AMOUNT; i++) { labels_array[i] = -1; }
 
     size_t          commands_and_arguments_counted = 0;
-    potential_error assemble_file_stage_1 = assemble_file_second(file_buffer, bytecode, labels_array, FIRST, &commands_and_arguments_counted, bytecode_capacity);
+    potential_error assemble_file_stage_1 = assemble_file_second(file_buffer, bytecode,                       labels_array, 
+                                                                 FIRST,      &commands_and_arguments_counted, bytecode_capacity, 
+                                                                 file_buffer_size);
 
     PRINTF("Ошибка после первого ассембла: [%d]\n", assemble_file_stage_1);
     GETCHAR();
     PRINTF("Количество прочитанных символов: [%zu]\n", commands_and_arguments_counted);
     GETCHAR(); 
 
-    potential_error assemble_file_stage_2 = assemble_file_second(file_buffer, bytecode, labels_array, SECOND, &commands_and_arguments_counted, bytecode_capacity);
+    potential_error assemble_file_stage_2 = assemble_file_second(file_buffer, bytecode,                       labels_array, 
+                                                                 SECOND,      &commands_and_arguments_counted, bytecode_capacity, 
+                                                                 file_buffer_size);
 
     PRINTF("Ошибка после второго ассембла: [%d]\n", assemble_file_stage_2);
     GETCHAR();
+    
+    potential_error write_status = write_bytecode_in_binary(exit_filename, *bytecode, commands_and_arguments_counted);
 
-    return OK;
+    return write_status;
 }
 
 char*           initialize_file_buffer(const char* filename, struct stat* file_buffer_struct) {
-    assert(filename);
+    assert(filename && file_buffer_struct);
 
     int stat_status = stat(filename, file_buffer_struct);
 
@@ -82,16 +93,18 @@ char*           initialize_file_buffer(const char* filename, struct stat* file_b
 }
 
 potential_error load_file_buffer(const char* filename, char* file_buffer, off_t struct_size) {
+    assert(filename && file_buffer);
+
     int file_descr = open(filename, O_RDONLY);
 
     if (file_descr != -1) {
-        ssize_t bytes_read = read(file_descr, file_buffer, struct_size);
+        ssize_t bytes_read = read(file_descr, file_buffer, struct_size - 1);
         
-        if (bytes_read == struct_size) {
+        if (bytes_read == struct_size - 1) {
             PRINTF("всё окей, размеры совпадают\n");
             GETCHAR();
             
-            file_buffer[struct_size] = '\0';
+            file_buffer[struct_size - 1] = '\0';
             bytes_read++;
 
             return OK;
@@ -112,18 +125,22 @@ potential_error load_file_buffer(const char* filename, char* file_buffer, off_t 
     }
 }
 
-potential_error assemble_file_second(char*        buffer_in,    uint8_t* bytecode, long long* labels_array, 
-                                     progon_index progon_index, size_t*  commands_and_arguments_counted, 
-                                     long long    bytecode_capacity) 
+potential_error assemble_file_second(char*         buffer_in,         uint8_t** bytecode, long long* labels_array, 
+                                     progon_index  progon_index,      size_t*   commands_and_arguments_counted, 
+                                     long long*    bytecode_capacity, long long file_buffer_size) 
 {
-    assert(buffer_in);
-    assert(bytecode);
+    assert(buffer_in && bytecode && labels_array && commands_and_arguments_counted && bytecode_capacity);
 
-    long long  instruction_pointer = 0;
+    long long  instruction_pointer               = 0;
     char       single_command_line[MAX_LINE + 1] = {};
     int        debug_index                       = 0;
+    long long  skipped_length                    = 0;
 
-    while (sscanf(buffer_in, "%256[^\n]%n", single_command_line, &debug_index) == 1) {
+    PRINTF("FILE_BUFFER CAPACITY: [%lld]\n", file_buffer_size);
+    GETCHAR(); // 
+
+    while (skipped_length < file_buffer_size && (sscanf(buffer_in, "%256[^\n]%n", single_command_line, &debug_index) == 1)) { 
+        // обязательная проверка на то, можем ли мы обращаться к буферу через sscanf (для этого вводим индекс skipped_length)
 
         // прочитал строку в массив single_command_line
 
@@ -139,11 +156,34 @@ potential_error assemble_file_second(char*        buffer_in,    uint8_t* bytecod
         if (check_length_status == OK) {
             PRINTF("ДЕБАГ ИНДЕКС: <%d>\n", debug_index);
             GETCHAR();
-            debug_index += 1; // перешагнули через \n
-            buffer_in   += debug_index;
 
-            PRINTF("assemble_file_second ||\nbuffer_in ||\nГДЕ Я:\n<%s>, <%c>\n", buffer_in, *buffer_in);
+            debug_index    += 1; // перешагнули через \n
+            skipped_length += debug_index;
+            buffer_in      += debug_index;
+
+            PRINTF("пропущенная длина: [%lld]\n", skipped_length);
             GETCHAR();
+            
+            if (skipped_length < file_buffer_size) {
+                PRINTF("skipped_length <%lld> VS file_buffer_size <%lld>\n", skipped_length, file_buffer_size);
+                PRINTF("assemble_file_second ||\nbuffer_in ||\nГДЕ Я:\n<%s>, <%c>\n", buffer_in, *buffer_in);
+                GETCHAR();
+            }
+
+            else {
+                PRINTF("Из-за арифметики со слэш n мы вышли за пределы буфера\n");
+                GETCHAR();
+                long long difference = skipped_length - file_buffer_size + 1; // +1 потому что: допустим
+
+                /* 
+                    skipped length = 51, что есть размер буфера. 51 - недопустимый для адреса индекс
+                    (максимум 50). тогда skipped_length - file_buffer_size даст 0, а по факту я вылез
+                    за границы своего массива. поэтому прибавляем единичку к разнице, чтобы дифференцс соответствовал
+                    максимально допустимому индексу для адресации. 51 - 51 + 1 = 1. именно столько я должен отнять от buffer_in 
+                */
+
+                buffer_in -= difference; // теперь если я и буду работать с buffer_in, это не приведёт к проблемам
+            }
             // 1 шаг выполнили
 
             int      command_length = 0;
@@ -176,15 +216,18 @@ potential_error assemble_file_second(char*        buffer_in,    uint8_t* bytecod
         
     }
 
-    if (progon_index == FIRST) { *commands_and_arguments_counted = (instruction_pointer + 1); }
+    if (progon_index == FIRST) { *commands_and_arguments_counted = instruction_pointer; } // было + 1
 
     return OK;
 }
 
-potential_error process_command_byhash(uint32_t      command_hash,         char*           single_command_line, 
-                                        char*        command_line_ptr,     long long*      labels_array,
-                                        long long*   instruction_pointer,  uint8_t*        bytecode, 
-                                        long long    bytecode_capacity) {
+potential_error process_command_byhash(uint32_t       command_hash,         char*           single_command_line, 
+                                        char*         command_line_ptr,     long long*      labels_array,
+                                        long long*    instruction_pointer,  uint8_t**       bytecode, 
+                                        long long*    bytecode_capacity) 
+{
+    assert(single_command_line && command_line_ptr && labels_array && instruction_pointer && bytecode && bytecode_capacity);
+
     switch (command_hash) {
 
         MACROS_PROCESS_PUSH_POP_BY_HASH(PUSH);
@@ -223,55 +266,71 @@ potential_error write_operand(asm_commands_nums func_asm_code,
                               uint8_t                   flags,
                               register_nums               reg,
                               STACK_DATA_TYPE          chislo,
-                              uint8_t*               bytecode,
+                              uint8_t**              bytecode,
                               long long*  instruction_pointer,
-                              long long     bytecode_capacity)
+                              long long*    bytecode_capacity)
 {
+    assert(bytecode && instruction_pointer && bytecode_capacity);
+
     uint8_t func_asm_code_uint = (uint8_t)func_asm_code;
 
     func_asm_code_uint = func_asm_code_uint | flags;
 
-    if ((*instruction_pointer < bytecode_capacity) && (bytecode_capacity - *instruction_pointer > sizeof(uint8_t))) {
-        memcpy(bytecode + *instruction_pointer, &func_asm_code_uint, sizeof(uint8_t));
-        *instruction_pointer += sizeof(uint8_t);
+    if ((*bytecode_capacity - *instruction_pointer) < sizeof(uint8_t)) {
+        PRINTF("Появилась необходимость в реаллоке\n");
+        GETCHAR();
+
+        potential_error recalloc_status = recalloc(bytecode, bytecode_capacity);
+        if (recalloc_status != OK) { return recalloc_status; }
     }
 
-    else { PRINTF("попытка записать func_asm_code_uint: недостаточно места\n"); GETCHAR(); return BYTECODE_OVERFLOW; }
+    memcpy(*bytecode + *instruction_pointer, &func_asm_code_uint, sizeof(uint8_t));
+    *instruction_pointer += sizeof(uint8_t);
 
     if (flags & REGISTER_BIT) {
-        PRINTF("Мы попали в регистер бит\n");
+        PRINTF("Мы попали в REGISTER бит\n");
         GETCHAR();
 
         uint8_t reg_enum_uint  = (uint8_t)reg;
         
-        if ((*instruction_pointer < bytecode_capacity) && (bytecode_capacity - *instruction_pointer > sizeof(uint8_t))) {
-            memcpy(bytecode + *instruction_pointer, &reg_enum_uint, sizeof(uint8_t));
-            *instruction_pointer += sizeof(uint8_t);
+        if ((*bytecode_capacity - *instruction_pointer) < sizeof(uint8_t)) {
+            PRINTF("Появилась необходимость в реаллоке\n");
+            GETCHAR();
+
+            potential_error recalloc_status = recalloc(bytecode, bytecode_capacity);
+            if (recalloc_status != OK) { return recalloc_status; }
         }
 
-        else { PRINTF("попытка записать reg_enum_uint: недостаточно места\n"); GETCHAR(); return BYTECODE_OVERFLOW; }
+        memcpy(*bytecode + *instruction_pointer, &reg_enum_uint, sizeof(uint8_t));
+        *instruction_pointer += sizeof(uint8_t);
     }
 
     if (flags & CONST_BIT) {
-        PRINTF("Мы попали в конст бит\n");
-        GETCHAR();
+        PRINTF("Мы попали в CONST бит\n");
+        GETCHAR();        
+    
+        if ((*bytecode_capacity - *instruction_pointer) < sizeof(STACK_DATA_TYPE)) {
+            PRINTF("Появилась необходимость в реаллоке\n");
+            GETCHAR();
 
-        if ((*instruction_pointer < bytecode_capacity) && (bytecode_capacity - *instruction_pointer > sizeof(STACK_DATA_TYPE))) {
-            memcpy(bytecode + *instruction_pointer, &chislo, sizeof(STACK_DATA_TYPE));
-            *instruction_pointer += sizeof(STACK_DATA_TYPE);
+            potential_error recalloc_status = recalloc(bytecode, bytecode_capacity);
+            if (recalloc_status != OK) { return recalloc_status; }
         }
-        
-        else { PRINTF("попытка записать chislo: недостаточно места\n"); GETCHAR(); return BYTECODE_OVERFLOW; }
+
+        memcpy(*bytecode + *instruction_pointer, &chislo, sizeof(STACK_DATA_TYPE));
+        *instruction_pointer += sizeof(STACK_DATA_TYPE);
     }
 
     return OK;
 }
 
-potential_error parse_operand_push_pop(char*               command_line_ptr, 
-                                       operand_data*  ptr_on_operand_struct, 
-                                       int*                     debug_index,
-                                       asm_commands_nums      func_asm_code) 
+potential_error parse_operand_push_pop(char*                command_line_ptr, 
+                                       operand_data*        ptr_on_operand_struct, 
+                                       int*                 debug_index,
+                                       asm_commands_nums    func_asm_code) 
 {
+    assert(command_line_ptr && ptr_on_operand_struct && debug_index);
+
     char reg[MAX_COMMAND_LEN] = {};
     int  register_flag        = 0;
     char char_for_pop         = 0;
@@ -351,12 +410,14 @@ potential_error parse_operand_push_pop(char*               command_line_ptr,
     return OK;
 }
 
-potential_error validate_push_pop_command(char*              command_line_ptr, 
-                                          asm_commands_nums  func_asm_code, 
-                                          uint8_t*           bytecode,
-                                          long long*         instruction_pointer,
-                                          long long          bytecode_capacity) 
+potential_error validate_push_pop_command(char*               command_line_ptr, 
+                                          asm_commands_nums   func_asm_code, 
+                                          uint8_t**           bytecode,
+                                          long long*          instruction_pointer,
+                                          long long*          bytecode_capacity) 
 {
+    assert(command_line_ptr && bytecode && instruction_pointer && bytecode_capacity);
+
     PRINTF("validate_push_pop_command (1)\nна каком мы сейчас символе: [%c], [%s]\n", *command_line_ptr, command_line_ptr);
     GETCHAR();
 
@@ -395,6 +456,8 @@ potential_error validate_push_pop_command(char*              command_line_ptr,
 }
 
 register_nums   determine_register(char* reg) {
+    assert(reg);
+
     PRINTF("[%s], наш регистр", reg);
     GETCHAR();
 
@@ -422,12 +485,14 @@ register_nums   determine_register(char* reg) {
     }
 }
 
-potential_error validate_zero_operands_commands(char*              command_line_ptr, 
-                                                asm_commands_nums  func_asm_code, 
-                                                uint8_t*           bytecode,
-                                                long long*         instruction_pointer,
-                                                long long          bytecode_capacity) 
+potential_error validate_zero_operands_commands(char*               command_line_ptr, 
+                                                asm_commands_nums   func_asm_code, 
+                                                uint8_t**           bytecode,
+                                                long long*          instruction_pointer,
+                                                long long*          bytecode_capacity) 
 {
+    assert(command_line_ptr && bytecode && instruction_pointer && bytecode_capacity);
+
     PRINTF("validate_zero_operands_commands (1)\nна каком мы сейчас символе: [%c], [%s]\n", *command_line_ptr, command_line_ptr);
     GETCHAR();
 
@@ -457,6 +522,8 @@ potential_error validate_zero_operands_commands(char*              command_line_
 }
 
 potential_error check_string_after_arg(char* command_line_ptr) {
+    assert(command_line_ptr);
+
     PRINTF("check_string_after_arg (1)\nна каком мы сейчас символе: [%c], [%s]\n", *command_line_ptr, command_line_ptr);
     GETCHAR();
 
@@ -466,13 +533,15 @@ potential_error check_string_after_arg(char* command_line_ptr) {
     else                             { return INCORRECT_COMMAND_LINE; }
 }
 
-potential_error validate_commands_only_labels(char*             command_line_ptr, 
-                                              long long*        labels_array, 
-                                              asm_commands_nums func_asm_code,
-                                              uint8_t*          bytecode,
-                                              long long*        instruction_pointer,
-                                              long long         bytecode_capacity) 
+potential_error validate_commands_only_labels(char*              command_line_ptr, 
+                                              long long*         labels_array, 
+                                              asm_commands_nums  func_asm_code,
+                                              uint8_t**          bytecode,
+                                              long long*         instruction_pointer,
+                                              long long*         bytecode_capacity) 
 {
+    assert(command_line_ptr && labels_array && bytecode && instruction_pointer && bytecode);
+
     PRINTF("validate_commands_only_labels (1)\nна каком мы сейчас символе: [%c], [%s]\n", *command_line_ptr, command_line_ptr);
     GETCHAR();
     
@@ -538,6 +607,8 @@ potential_error validate_labels_and_else(char*      single_command_line,
                                          long long* labels_array, 
                                          long long  current_instruction) 
 {
+    assert(single_command_line && labels_array);
+
     PRINTF("Где я: [%s], [%c]", single_command_line, *single_command_line);
     GETCHAR();
 
@@ -590,6 +661,8 @@ potential_error validate_labels_and_else(char*      single_command_line,
 }
 
 potential_error validate_string_length(char* buffer_in, int debug_index) {
+    assert(buffer_in);
+
     PRINTF("[%d] debug_index\n", debug_index);
     GETCHAR();
 
@@ -603,7 +676,49 @@ potential_error validate_string_length(char* buffer_in, int debug_index) {
     else { return OK; }
 }
 
+potential_error recalloc(uint8_t** bytecode, long long* bytecode_capacity) {
+    assert(bytecode && bytecode_capacity);
+
+    uint8_t* safety_ptr_on_bytecode = (uint8_t* )realloc(*bytecode, (*bytecode_capacity * 2));
+        if (safety_ptr_on_bytecode != NULL) {
+            PRINTF("успешно зареаллокали массив байткода\n");
+            GETCHAR();
+            
+            *bytecode = safety_ptr_on_bytecode;
+            zero_after_calloc(*bytecode, *bytecode_capacity, (*bytecode_capacity * 2));
+            *bytecode_capacity *= 3;
+
+            return OK;
+        }
+        
+        else {
+            PRINTF("не удалось выделить память под байткод реаллоком\n");
+            GETCHAR();
+
+            return REALLOC_FAILED;
+        }
+}
+
+potential_error write_bytecode_in_binary(const char* exit_filename, uint8_t* bytecode, long long valuable_bytes) {
+    assert(exit_filename && bytecode);
+
+    FILE* file_pointer = fopen(exit_filename, "wb");
+
+    if (file_pointer != NULL) {
+        PRINTF("Файл открылся успешно (write_bytecode_in_binary)\n");
+        PRINTF("Число значимых uint8_t байтов: <%lld>\n", valuable_bytes);
+        GETCHAR();
+
+        fwrite(bytecode, sizeof(uint8_t), valuable_bytes, file_pointer);
+        return OK;
+    }
+
+    else { PRINTF("Файл открыть не удалось (write_bytecode_in_binary)\n"); return FILE_NOT_OPENNED; }
+}
+
 uint32_t        pull_the_fucking_command(const char* single_command_line, int* command_length) {
+    assert(single_command_line && command_length);
+
     char command_buffer[MAX_COMMAND_LEN] = {};
     int  sscanf_result = sscanf(single_command_line, "%15s%n", command_buffer, command_length); // MAX_COMMAND_LEN - 1
     // заведомо едим больше чем текущая максимальная длина команды
@@ -618,12 +733,16 @@ uint32_t        pull_the_fucking_command(const char* single_command_line, int* c
 }
 
 void            clear_command_array(char* command) {
+    assert(command);
+
     for (int i = 0; i < MAX_LINE; i++) {
         command[i] = 0;
     }
 }
 
 void            debugger_like_printf(char* file_buffer, struct stat* to_be_assemblered_struct) {
+    assert(file_buffer && to_be_assemblered_struct);
+
     for (off_t i = 0; i < to_be_assemblered_struct->st_size + 1; i++) {
         if (file_buffer[i] == '\n') {
             printf("[\\");
@@ -639,3 +758,11 @@ void            debugger_like_printf(char* file_buffer, struct stat* to_be_assem
     }
     printf("\n");
 }
+ 
+void            zero_after_calloc(uint8_t* bytecode, long long start_ptr, long long end_ptr) {
+    assert(bytecode);
+
+    for (long long i = start_ptr; i < end_ptr; i++) {
+        bytecode[i] = 0;
+    }
+}     

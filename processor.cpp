@@ -162,6 +162,11 @@ struct cpu_struct {
 
     cmp_compare_res  cmp_flag;
 };
+ 
+//TODO - Теперь массив кода - uint8_t неравномерный. переделать массив кода
+//TODO - переделать в каждой функции переход instruction pointer
+//TODO - обработка всех команд кроме push и pop
+//TODO - обработка полей push / pop
 
 cpu_status push_asm(cpu_struct* cpu) {
     PRINTF("Текущий индекс команды: [%lld]\n", cpu->instruction_pointer);
@@ -654,7 +659,7 @@ cpu_status cmp_asm(cpu_struct* cpu) {
 
 // ----------------------------------------------------------------------------------------------------------------
 
-cpu_status finish_instruction(cpu_struct* cpu, stack_potential_error stack_opname_status, unsigned int jumps) {
+cpu_status  finish_instruction(cpu_struct* cpu, stack_potential_error stack_opname_status, unsigned int jumps) {
     if (stack_opname_status == OK) {
         cpu->instruction_pointer += jumps; 
         cpu_code_array_dump(cpu, cpu->code_obsolet_size);
@@ -725,7 +730,7 @@ cpu_struct* initialize_cpu_struct(const char* filename, size_t amounts_of_cmds_a
     }
 }
 
-size_t get_file_cmds_n_args_amount(const char* filename) {
+size_t      get_file_cmds_n_args_amount(const char* filename) {
     assert(filename);
     
     FILE* file = fopen(filename, "r");
@@ -754,7 +759,7 @@ size_t get_file_cmds_n_args_amount(const char* filename) {
     return 0;
 }
 
-cpu_status cpu_work_cycle(cpu_struct* cpu) {
+cpu_status  cpu_work_cycle(cpu_struct* cpu) {
     long long instruction_pointer  = cpu->instruction_pointer;
     const size_t code_obsolet_size = cpu->code_obsolet_size;
 
@@ -796,7 +801,7 @@ cpu_status cpu_work_cycle(cpu_struct* cpu) {
     return CPU_UNCHECKED_CASE;
 }
 
-void cpu_code_array_dump(cpu_struct* cpu, size_t size_of_array) {
+void        cpu_code_array_dump(cpu_struct* cpu, size_t size_of_array) {
     assert(cpu);
 
     printf(DARK_PURPLE "==============================================================================================================\n");
