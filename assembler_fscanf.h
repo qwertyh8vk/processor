@@ -60,14 +60,14 @@
             break;                                                                \
         }
 
-#define MEMORY_BIT   (0b10000000)
-#define REGISTER_BIT (0b01000000)
-#define CONST_BIT    (0b00100000)
+#define MEMORY_BIT   0b10000000
+#define REGISTER_BIT 0b01000000
+#define CONST_BIT    0b00100000
 
 #define MAX_LABELS_AMOUNT 128
 #define MAX_LINE          256
 
-// #define ON_DEBUG
+#define ON_DEBUG
 
 #ifdef  ON_DEBUG
     #define PRINTF(...) printf(__VA_ARGS__)
@@ -80,6 +80,11 @@
 #endif
 
 typedef double STACK_DATA_TYPE;
+
+enum datatype {
+    STACK_TYPE  = 1,
+    LONG_LONG   = 2,
+};
 
 enum progon_index {
     FIRST  = 1,
@@ -113,6 +118,9 @@ typedef struct {
     uint8_t                  flags;
     register_nums              reg;
     STACK_DATA_TYPE         number;
+
+    //FIXME - Оч важная хуйня!!!!!
+    long long                label;
 } operand_data;
 
 potential_error obrabotka_faila(char*      file_buffer,       uint8_t** bytecode, const char* exit_filename,
@@ -131,13 +139,14 @@ potential_error process_command_byhash(uint32_t       command_hash,         char
                                         long long*    instruction_pointer,  uint8_t**       bytecode, 
                                         long long*    bytecode_capacity);
 
-potential_error write_operand(asm_commands_nums func_asm_code,
-                              uint8_t                   flags,
-                              register_nums               reg,
-                              STACK_DATA_TYPE          chislo,
-                              uint8_t**              bytecode,
-                              long long*  instruction_pointer,
-                              long long*    bytecode_capacity);
+potential_error write_operand(asm_commands_nums     func_asm_code,
+                              uint8_t                       flags,
+                              register_nums                   reg,
+                              void*                        chislo,
+                              uint8_t**                  bytecode,
+                              long long*      instruction_pointer,
+                              long long*        bytecode_capacity,
+                              datatype      what_we_are_memcpying);
 
 potential_error parse_operand_push_pop(char*               command_line_ptr, 
                                        operand_data*  ptr_on_operand_struct, 

@@ -1,11 +1,11 @@
-enum register_nums {
+enum register_nums : uint8_t {
 	AX_ASM = 1,
 	BX_ASM = 2,
 	CX_ASM = 3,
 	DX_ASM = 4,
 };
 
-enum asm_commands_nums {
+enum asm_commands_nums : uint8_t {
 	PUSH_ASM = 1,
 	POP_ASM  = 2,
 	ADD_ASM  = 3,

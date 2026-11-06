@@ -21,7 +21,7 @@
 #define POISON_VALUE_2                81337228
 #define POISON_HASH_VALUE               696969
 #define MAX_CAPACITY_VALUE                8194
-#define EPSILON                           1e-5
+#define EPSILON                           1e-8
 
 #define STACK_INIT_CAPACITY    4
 #define INCREASE_COEFF         2

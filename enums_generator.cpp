@@ -66,12 +66,12 @@ int enums_header_generator(const char* filename_out) {
         printf("файл открылся корректно\n");
         getchar();
 
-        fprintf(file_out, "enum register_nums {\n");// это временное решение, мне оно нужно, пока я фикшу другие штуки
+        fprintf(file_out, "enum register_nums : uint8_t {\n");// это временное решение, мне оно нужно, пока я фикшу другие штуки
 
         for (int i = 0; i < n_regs; i++) { fprintf(file_out, "\t%s_ASM = %d,\n", reg_names[i], i + 1); }
 
         fprintf(file_out, "};\n\n");
-        fprintf(file_out, "enum asm_commands_nums {\n");
+        fprintf(file_out, "enum asm_commands_nums : uint8_t {\n");
         // проверка на долбаебушку тут отсутствует, т.к. это ведь мой файл с моими командами, проверка на дибилушку должна быть в ассемблере!
         int how_many_whitespaces = 0;
 

@@ -233,7 +233,7 @@ stack_potential_error stack_push(defended_stack* pointer_on_stack, STACK_DATA_TY
 
                 // так называемое нововведение, если что все проблемы будут тут!!! 
 
-                for (int i = (pointer_on_stack->size + 1); i < (pointer_on_stack->capacity + 1); i++) {
+                for (size_t i = (pointer_on_stack->size + 1); i < (pointer_on_stack->capacity + 1); i++) {
                     pointer_on_array[i] = 0;
                 }
             }
