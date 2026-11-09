@@ -10,23 +10,25 @@
 #include "stack_v3.h"
 #include "generated_enums.h"
 
-#define REGS_AMOUNT           4
-#define BASIC_LENGTH          2 
-#define FUNCS_AMOUNT         21
-#define MAX_AMT_OF_DGTS     150
+#define REGS_AMOUNT            4
+#define BASIC_LENGTH           2 
+#define FUNCS_AMOUNT          23
+#define MAX_AMT_OF_DGTS      150
 
-#define MEMORY_BIT    0b10000000
-#define REGISTER_BIT  0b01000000
-#define CONST_BIT     0b00100000
+#define MEMORY_BIT      0b10000000
+#define REGISTER_BIT    0b01000000
+#define CONST_BIT       0b00100000
 
-#define OPCODE_MASKA  0b00011111
-#define MODE_MASKA    0b11100000
+#define OPCODE_MASKA    0b00011111
+#define MODE_MASKA      0b11100000
 
-#define ONLY_RAM      0b10000000
-#define REG_CONST     0b01100000
-#define CONST         0b00100000
-#define NOTHING       0b00000000
+#define ONLY_RAM        0b10000000
+#define REG_CONST       0b01100000
+#define CONST           0b00100000
+#define NOTHING         0b00000000
 
+#define PROCPRINTF(...)  printf(__VA_ARGS__)
+#define PROCGETCHAR(...) getchar(__VA_ARGS__)
 
 #define JMP_MACROS_INITIALIZE(func_name, mode_1, mode_2)   \
     cpu_status func_name##_asm(cpu_struct* cpu) { \                  
@@ -57,7 +59,7 @@ enum cpu_status {
     BAD_COMMAND_MODE       = -6,
 };
 
-const   int RAM_MB = 8192;
+const   int           RAM_MB = 8192;
 
 typedef struct        cpu_struct cpu_struct;
 typedef               cpu_status (*cmd_handler)(cpu_struct* cpu);
@@ -106,22 +108,16 @@ cpu_status            hlt_asm(cpu_struct*   cpu);
 
 cpu_status            dup_asm(cpu_struct*   cpu);
 cpu_status            cmp_asm(cpu_struct*   cpu);
+cpu_status            over_asm(cpu_struct*  cpu);
+cpu_status            swap_asm(cpu_struct*  cpu);
 
 cpu_status            cpu_work_cycle(cpu_struct* cpu);
 
 
 cmd_handler asm_funcs[FUNCS_AMOUNT] {
     /* первый логический блок */
-
     push_asm,
-    // pushr_asm, 
-    
-    /* удаляем две команды, поскольку мы делаем побитовые операции */
-    /* удаляем две команды, поскольку мы делаем побитовые операции */
-    /* удаляем две команды, поскольку мы делаем побитовые операции */
-    
     pop_asm,
-    // popr_asm,
 
     /* второй логический блок */
     add_asm,
@@ -153,14 +149,16 @@ cmd_handler asm_funcs[FUNCS_AMOUNT] {
     /* всё что не вошло в предыдущие блоки*/
     dup_asm,
     cmp_asm,
+    over_asm,
+    swap_asm,
 };
 
 int main() {
     const char* assembler_to_cpu = "assembler_res.bin";
     size_t bytes_in_bin_file_amount = get_bytes_in_bin_amount(assembler_to_cpu);
 
-    PRINTF("Что насчитала моя функция get_bytes_in_bin_amount: [%zu]\n", bytes_in_bin_file_amount);
-    GETCHAR();
+    PROCPRINTF("Что насчитала моя функция get_bytes_in_bin_amount: [%zu]\n", bytes_in_bin_file_amount);
+    PROCGETCHAR();
 
     cpu_struct* ryzen7_5700 = initialize_cpu_struct(assembler_to_cpu, bytes_in_bin_file_amount);
 
@@ -198,30 +196,31 @@ struct cpu_struct {
 // TODO  - видеопамять
 // TODO  - Фибоначи
 // TODO  - Отсортировать функции
-// FIXME - [-Wsign-compare]
+
+// FIXME - [-Wsign-compare] !!!!!!!!!!!!!!!!!
 
 cpu_status  push_asm(cpu_struct* cpu) {
-    PRINTF("Текущий байт байткода: [%lld]\n", cpu->instruction_pointer);
-    GETCHAR();
+    PROCPRINTF("Текущий байт байткода: [%lld]\n", cpu->instruction_pointer);
+    PROCGETCHAR();
 
     uint8_t our_command = (cpu->code)[cpu->instruction_pointer];
     cpu->instruction_pointer += sizeof(uint8_t);
 
-    PRINTF("что у нас там по команде(десятичное представление): <%u>\n", our_command);
-    GETCHAR();
+    PROCPRINTF("что у нас там по команде" RED " (десятичное представление): " RESET "<%u>\n", our_command);
+    PROCGETCHAR();
 
     STACK_DATA_TYPE number = 0;
 
     if (!(our_command ^ ONLY_RAM) || !(our_command ^ NOTHING)) {
-        PRINTF("По-хорошему это должно быть работой ассемблера. попали в недопустимый режим для пуша\n");
+        PROCPRINTF("По-хорошему это должно быть работой ассемблера. попали в недопустимый режим для пуша\n");
 
         return BAD_COMMAND_MODE;
     }
 
     if (our_command & REGISTER_BIT) { 
         uint8_t our_register = (cpu->code)[cpu->instruction_pointer];
-        PRINTF("our register: <%u>\n", our_register);
-        GETCHAR();
+        PROCPRINTF("our register: <%u>\n", our_register);
+        PROCGETCHAR();
         assert((our_register > 0) && (our_register < 5));
 
         number += (cpu->regs)[our_register - 1]; // потому что записывались enum'ы от 1 до 4. 
@@ -232,8 +231,8 @@ cpu_status  push_asm(cpu_struct* cpu) {
         STACK_DATA_TYPE chislo = 0;
         memcpy(&chislo, &((cpu->code)[cpu->instruction_pointer]), sizeof(STACK_DATA_TYPE));
 
-        PRINTF("число которое скопировали: <%lf>\n", chislo);
-        GETCHAR();
+        PROCPRINTF("число которое скопировали: <%lf>\n", chislo);
+        PROCGETCHAR();
 
         number += chislo;
         cpu->instruction_pointer += sizeof(STACK_DATA_TYPE);
@@ -258,9 +257,7 @@ cpu_status  push_asm(cpu_struct* cpu) {
         else { return check_whole_number_status; }
     }
 
-    PRINTF("Без отладки никуда. что мы считали: [%lf]\n", number);
-
-    cpu_code_array_dump(cpu, cpu->code_obsolet_size);
+    PROCPRINTF("Без отладки никуда. что мы считали: [%lf]\n", number);
 
     defended_stack* ptr_on_cpu_calc_stack   = cpu->calculations_stack;
     stack_potential_error stack_push_status = stack_push(ptr_on_cpu_calc_stack, number);
@@ -269,7 +266,7 @@ cpu_status  push_asm(cpu_struct* cpu) {
 }
 
 cpu_status  pop_asm(cpu_struct* cpu) {
-    PRINTF("Текущий байт байткода: [%lld]\n", cpu->instruction_pointer);
+    PROCPRINTF("Текущий байт байткода: [%lld]\n", cpu->instruction_pointer);
 
     uint8_t our_command = (cpu->code)[cpu->instruction_pointer];
     defended_stack* ptr_on_cpu_calc_stack  = cpu->calculations_stack;
@@ -278,9 +275,9 @@ cpu_status  pop_asm(cpu_struct* cpu) {
 
     STACK_DATA_TYPE videoram_index = 0;
 
-    if (!(our_command ^ ONLY_RAM) || !(our_command ^ REG_CONST) || !(our_command ^ CONST) || !(our_command ^ NOTHING)) {
-        PRINTF("По-хорошему это должно быть работой ассемблера. попали в недопустимый режим для попа\n");
-        GETCHAR();
+    if (!(our_command ^ ONLY_RAM) || !(our_command ^ REG_CONST) || !(our_command ^ CONST)) {
+        PROCPRINTF("По-хорошему это должно быть работой ассемблера. попали в недопустимый режим для попа\n");
+        PROCGETCHAR();
 
         return BAD_COMMAND_MODE;
     }
@@ -301,8 +298,8 @@ cpu_status  pop_asm(cpu_struct* cpu) {
             STACK_DATA_TYPE chislo = 0;
             memcpy(&chislo, &((cpu->code)[cpu->instruction_pointer]), sizeof(STACK_DATA_TYPE));
 
-            PRINTF("число которое скопировали: <%lf>\n", chislo);
-            GETCHAR();
+            PROCPRINTF("число которое скопировали: <%lf>\n", chislo);
+            PROCGETCHAR();
 
             videoram_index += chislo;
             cpu->instruction_pointer += sizeof(STACK_DATA_TYPE);
@@ -320,20 +317,28 @@ cpu_status  pop_asm(cpu_struct* cpu) {
         return finish_instruction(cpu, stack_pop_status, 0);
     }
 
-    uint8_t our_register = (cpu->code)[cpu->instruction_pointer];
+    if (our_command & REGISTER_BIT) {
+        uint8_t our_register = (cpu->code)[cpu->instruction_pointer];
 
-    assert((our_register > 0) && (our_register < 5));
+        assert((our_register > 0) && (our_register < 5));
 
-    stack_potential_error stack_pop_status = stack_pop(ptr_on_cpu_calc_stack, &((cpu->regs)[our_register - 1]));
-    // cpu->instruction_pointer += sizeof(uint8_t);
-    return finish_instruction(cpu, stack_pop_status, sizeof(uint8_t));
+        stack_potential_error stack_pop_status = stack_pop(ptr_on_cpu_calc_stack, &((cpu->regs)[our_register - 1]));
+        return finish_instruction(cpu, stack_pop_status, sizeof(uint8_t));
+    }
 
+    else {
+        PROCPRINTF(BLUE "ПУСТОЙ ПОП!\n" RESET);
+        PROCGETCHAR();
+
+        stack_potential_error stack_pop_status = stack_pop(ptr_on_cpu_calc_stack, NULL);
+        return finish_instruction(cpu, stack_pop_status, 0);
+    }
 }
 
 // ----------------------------------------------------------------------------------------------------------------
 
 cpu_status  add_asm(cpu_struct* cpu) {
-    PRINTF("Текущий байт байткода: [%lld]\n", cpu->instruction_pointer);
+    PROCPRINTF("Текущий байт байткода: [%lld]\n", cpu->instruction_pointer);
 
     STACK_DATA_TYPE value_a = 0;
     STACK_DATA_TYPE value_b = 0;
@@ -355,18 +360,21 @@ cpu_status  add_asm(cpu_struct* cpu) {
 }
 
 cpu_status  sub_asm(cpu_struct* cpu) {
-    PRINTF("Текущий байт байткода: [%lld]\n", cpu->instruction_pointer);
+    PROCPRINTF("Текущий байт байткода: [%lld]\n", cpu->instruction_pointer);
 
     STACK_DATA_TYPE value_a = 0;
     STACK_DATA_TYPE value_b = 0;
-
+    /* 
+    5
+    3
+    */
     defended_stack* ptr_on_cpu_calc_stack = cpu->calculations_stack;
     
-    stack_potential_error stack_pop_a_status = stack_pop(ptr_on_cpu_calc_stack, &value_a);
-    stack_potential_error stack_pop_b_status = stack_pop(ptr_on_cpu_calc_stack, &value_b);
+    stack_potential_error stack_pop_a_status = stack_pop(ptr_on_cpu_calc_stack, &value_a); // 5
+    stack_potential_error stack_pop_b_status = stack_pop(ptr_on_cpu_calc_stack, &value_b); // 3
 
     if ((stack_pop_a_status == OK) && (stack_pop_b_status == OK)) {
-        STACK_DATA_TYPE diff_betw_a_b = value_a - value_b;
+        STACK_DATA_TYPE diff_betw_a_b = value_a - value_b; // 5 - 3
 
         stack_potential_error stack_push_status = stack_push(ptr_on_cpu_calc_stack, diff_betw_a_b);
 
@@ -377,7 +385,7 @@ cpu_status  sub_asm(cpu_struct* cpu) {
 }
 
 cpu_status  mul_asm(cpu_struct* cpu) {
-    PRINTF("Текущий байт байткода: [%lld]\n", cpu->instruction_pointer);
+    PROCPRINTF("Текущий байт байткода: [%lld]\n", cpu->instruction_pointer);
 
     STACK_DATA_TYPE value_a = 0;
     STACK_DATA_TYPE value_b = 0;
@@ -399,7 +407,7 @@ cpu_status  mul_asm(cpu_struct* cpu) {
 }
 
 cpu_status  div_asm(cpu_struct* cpu) {
-    PRINTF("Текущий байт байткода: [%lld]\n", cpu->instruction_pointer);
+    PROCPRINTF("Текущий байт байткода: [%lld]\n", cpu->instruction_pointer);
 
     STACK_DATA_TYPE value_a = 0;
     STACK_DATA_TYPE value_b = 0;
@@ -415,8 +423,8 @@ cpu_status  div_asm(cpu_struct* cpu) {
         if (fabs(value_b - 0) > EPSILON) { mul_of_a_b = value_a / value_b; }
 
         else {
-            PRINTF("Деление на ноль я пока ещё не определил. мб выкачу в дальнейших обновлениях\n");
-            GETCHAR();
+            PROCPRINTF("Деление на ноль я пока ещё не определил. мб выкачу в дальнейших обновлениях\n");
+            PROCGETCHAR();
 
             return CPU_ERR;
         }
@@ -430,7 +438,7 @@ cpu_status  div_asm(cpu_struct* cpu) {
 }
 
 cpu_status  sqrt_asm(cpu_struct* cpu) {
-    PRINTF("Текущий байт байткода: [%lld]\n", cpu->instruction_pointer);
+    PROCPRINTF("Текущий байт байткода: [%lld]\n", cpu->instruction_pointer);
 
     STACK_DATA_TYPE value_a = 0;
 
@@ -447,8 +455,8 @@ cpu_status  sqrt_asm(cpu_struct* cpu) {
         }
 
         else {
-            PRINTF("Корень квадратный из отр. числа пока не определил. мб выкачу в дальнейших обновлениях\n");
-            GETCHAR();
+            PROCPRINTF("Корень квадратный из отр. числа пока не определил. мб выкачу в дальнейших обновлениях\n");
+            PROCGETCHAR();
 
             return CPU_ERR;
         }
@@ -464,26 +472,26 @@ cpu_status  mod_asm(cpu_struct* cpu) {
 // ----------------------------------------------------------------------------------------------------------------
 
 cpu_status  jmp_asm(cpu_struct* cpu) {
-    PRINTF("Текущий байт байткода: [%lld]\n", cpu->instruction_pointer);
+    PROCPRINTF("Текущий байт байткода: [%lld]\n", cpu->instruction_pointer);
 
     cpu->instruction_pointer += sizeof(uint8_t);
     long long where_we_want_to_jump = 0;
 
     memcpy(&where_we_want_to_jump, &((cpu->code)[cpu->instruction_pointer]), sizeof(long long));
-    PRINTF("Что сохранилось (jmp_asm): <%lld>\n", where_we_want_to_jump);
+    PROCPRINTF("Что сохранилось (jmp_asm): <%lld>\n", where_we_want_to_jump);
 
     const size_t code_obsolet_size = cpu->code_obsolet_size;
 
     if (where_we_want_to_jump >= 0 && where_we_want_to_jump < code_obsolet_size) { cpu->instruction_pointer = where_we_want_to_jump; }
     
     else {
-        PRINTF("Нубля сюда прыгать я ещё не научился\n");
-        GETCHAR();
+        PROCPRINTF("Нубля сюда прыгать я ещё не научился\n");
+        PROCGETCHAR();
 
         return CPU_ERR;
     }
 
-    PRINTF("Установил точку откуда будем выполнять команды\n");
+    PROCPRINTF("Установил точку откуда будем выполнять команды\n");
     cpu_code_array_dump(cpu, code_obsolet_size);
 
     return CPU_FINE;
@@ -493,7 +501,7 @@ cpu_status  jmp_cond_universal(cpu_struct* cpu,
                                cmp_compare_res mode_1, 
                                cmp_compare_res mode_2) 
 {
-    PRINTF(PURPLE "ВЫЗВАННЫЙ РЕЖИМ ИМЕЕТ КОД [%d] %d]\n" RESET, mode_1, mode_2); // можно переделать в таблицу кодов , для этого нужно завести структуру
+    PROCPRINTF(PURPLE "ВЫЗВАННЫЙ РЕЖИМ ИМЕЕТ КОД [%d] [%d]\n" RESET, mode_1, mode_2); // можно переделать в таблицу кодов , для этого нужно завести структуру
 
     /* //////////////
     /               /
@@ -506,41 +514,42 @@ cpu_status  jmp_cond_universal(cpu_struct* cpu,
     /               /
     */ //////////////
 
-    GETCHAR();
+    PROCGETCHAR();
 
-    PRINTF("Текущий байт байткода: [%lld]\n", cpu->instruction_pointer);
+    PROCPRINTF("Текущий байт байткода: [%lld]\n", cpu->instruction_pointer);
     cpu->instruction_pointer += sizeof(uint8_t);
 
     long long where_we_want_to_jump = 0;
     memcpy(&where_we_want_to_jump, &((cpu->code)[cpu->instruction_pointer]), sizeof(long long));
     const size_t code_obsolet_size = cpu->code_obsolet_size;
 
-    PRINTF("куда мы хотим прыгнуть (на какой индекс): [%lld]\n", where_we_want_to_jump);
-    GETCHAR();
+    PROCPRINTF("куда мы хотим прыгнуть (на какой индекс): [%lld]\n", where_we_want_to_jump);
+    PROCGETCHAR();
 
     int cpu_current_flag = cpu->cmp_flag;
 
     if (cpu_current_flag == mode_1 || cpu_current_flag == mode_2) {
         if (where_we_want_to_jump >= 0 && where_we_want_to_jump < code_obsolet_size) { 
             cpu->instruction_pointer = where_we_want_to_jump; 
-            PRINTF("Установил точку откуда будем выполнять команды\n");
+            PROCPRINTF("Установил точку откуда будем выполнять команды\n");
             cpu_code_array_dump(cpu, code_obsolet_size);
 
             return CPU_FINE;
         }
 
         else {
-            PRINTF("Нубля сюда прыгать я ещё не научился\n");
-            GETCHAR();
+            PROCPRINTF("Нубля сюда прыгать я ещё не научился\n");
+            PROCGETCHAR();
 
             return CPU_ERR;
         }
     } // one more КОПИПАСТ, который можно починить
 
     else {
-        PRINTF("Ластовый вызванный CMP имеет значение не равное выбранному режиму: cmp_flag value = [%d]\n", cpu_current_flag);
-        GETCHAR();
-        
+        PROCPRINTF("Ластовый вызванный CMP имеет значение не равное выбранному режиму: cmp_flag value = [%d]\n", cpu_current_flag);
+        PROCGETCHAR();
+
+        cpu->instruction_pointer += sizeof(long long);
         return CPU_FINE;
     }
 }
@@ -554,7 +563,7 @@ JMP_MACROS_INITIALIZE(jmpe, EQUAL, EQUAL);
 // ----------------------------------------------------------------------------------------------------------------
 
 cpu_status  call_asm(cpu_struct* cpu) {
-    PRINTF("Текущий байт байткода: [%lld]\n", cpu->instruction_pointer);
+    PROCPRINTF("Текущий байт байткода: [%lld]\n", cpu->instruction_pointer);
 
     defended_stack* ptr_on_cpu_call_stack = cpu->call_stack;
     cpu->instruction_pointer += sizeof(uint8_t);
@@ -565,8 +574,8 @@ cpu_status  call_asm(cpu_struct* cpu) {
     long long where_we_want_to_start_from_again = cpu->instruction_pointer + (long long)sizeof(long long);
     const size_t code_obsolet_size = cpu->code_obsolet_size;
 
-    PRINTF("Значение, которое возьмёт ret в качестве ориентира куда возвращаться: [%lld]\n", where_we_want_to_start_from_again);
-    GETCHAR();
+    PROCPRINTF("Значение, которое возьмёт ret в качестве ориентира куда возвращаться: [%lld]\n", where_we_want_to_start_from_again);
+    PROCGETCHAR();
 
     stack_potential_error stack_push_wwwtsf_status = BAD_DEFAULT;
 
@@ -576,8 +585,8 @@ cpu_status  call_asm(cpu_struct* cpu) {
     }
 
     else {
-        PRINTF(DARK_PURPLE "Походу после CALL ничего не идёт, в таком случае ничего не делаю " RED "(Относим это к ошибке)\n" RESET);
-        GETCHAR();
+        PROCPRINTF(DARK_PURPLE "Походу после CALL ничего не идёт, в таком случае ничего не делаю " RED "(Относим это к ошибке)\n" RESET);
+        PROCGETCHAR();
 
         return CPU_ERR;
     }
@@ -587,7 +596,7 @@ cpu_status  call_asm(cpu_struct* cpu) {
             cpu_code_array_dump(cpu, code_obsolet_size);
 
             cpu->instruction_pointer = where_we_want_to_jump; 
-            PRINTF("Установил точку откуда будем выполнять команды\n");
+            PROCPRINTF("Установил точку откуда будем выполнять команды\n");
 
             cpu_code_array_dump(cpu, code_obsolet_size);
 
@@ -595,8 +604,8 @@ cpu_status  call_asm(cpu_struct* cpu) {
         }
 
         else {
-            PRINTF("Нубля сюда прыгать я ещё не научился\n");
-            GETCHAR();
+            PROCPRINTF("Нубля сюда прыгать я ещё не научился\n");
+            PROCGETCHAR();
 
             return CPU_ERR;
         }
@@ -606,7 +615,7 @@ cpu_status  call_asm(cpu_struct* cpu) {
 }
 
 cpu_status  ret_asm(cpu_struct* cpu) {
-    PRINTF("Текущий байт байткода: [%lld]\n", cpu->instruction_pointer);
+    PROCPRINTF("Текущий байт байткода: [%lld]\n", cpu->instruction_pointer);
 
     defended_stack* ptr_on_cpu_call_stack = cpu->call_stack;
     STACK_DATA_TYPE where_we_want_to_start_from_again = 0;
@@ -615,13 +624,13 @@ cpu_status  ret_asm(cpu_struct* cpu) {
     if (stack_pop_status == OK) {
         stack_dump(ptr_on_cpu_call_stack);
 
-        PRINTF("Индекс который сейчас вытащил ret: [%lld]\n", (long long)where_we_want_to_start_from_again);
+        PROCPRINTF("Индекс который сейчас вытащил ret: [%lld]\n", (long long)where_we_want_to_start_from_again);
 
         cpu_code_array_dump(cpu, cpu->code_obsolet_size);
 
         cpu->instruction_pointer = (long long)where_we_want_to_start_from_again;
-        PRINTF("Установил нужный индекс в ret'e\n");
-        GETCHAR();
+        PROCPRINTF("Установил нужный индекс в ret'e\n");
+        PROCGETCHAR();
 
         cpu_code_array_dump(cpu, cpu->code_obsolet_size);
 
@@ -634,50 +643,62 @@ cpu_status  ret_asm(cpu_struct* cpu) {
 // ----------------------------------------------------------------------------------------------------------------
 
 cpu_status  in_asm(cpu_struct* cpu) {
-    PRINTF("Текущий байт байткода: [%lld]\n", cpu->instruction_pointer);
-    PRINTF("НУ что, товарищ пользователь, введите число которое я запушу в calc_stack: ");
+    PROCPRINTF("Текущий байт байткода: [%lld]\n", cpu->instruction_pointer);
+    PROCPRINTF("НУ что, товарищ пользователь, введите число которое я запушу в calc_stack: ");
     char  read_string_typed_by_user[MAX_AMT_OF_DGTS] = {};
     char* fgets_result = fgets(read_string_typed_by_user, MAX_AMT_OF_DGTS, stdin);
 
     if (fgets_result != NULL) {
-        PRINTF("успешно записана строка в массив read_string_typed_by_user\n");
-        GETCHAR();
+        PROCPRINTF("успешно записана строка в массив read_string_typed_by_user\n");
+        PROCGETCHAR();
 
         defended_stack* ptr_on_cpu_calc_stack = cpu->calculations_stack;
 
         char* end_ptr = NULL;
         STACK_DATA_TYPE value_to_push_from_stdin = strtod(read_string_typed_by_user, &end_ptr);
-        PRINTF("На каком символе закончилось преобразование strtod: [%s]\n", end_ptr);
-        GETCHAR();
 
+        if (*end_ptr == '\n') {
+            PROCPRINTF("На каком символе закончилось преобразование strtod: [\\");
+            PROCPRINTF("n]\n");
+            PROCGETCHAR();
+        }
+
+        else {
+            PROCPRINTF("На каком символе закончилось преобразование strtod: [%c]", *end_ptr);
+            PROCGETCHAR();
+        }
+
+        PROCPRINTF(PURPLE "Что считали: <%lf>\n" RESET, value_to_push_from_stdin);
+        PROCGETCHAR();
         stack_potential_error stack_push_status = stack_push(ptr_on_cpu_calc_stack, value_to_push_from_stdin);
 
         return finish_instruction(cpu, stack_push_status, sizeof(uint8_t));
     }
 
     else {
-        PRINTF("fgets_result вернул NULL, нихуя себе!\n");
-        GETCHAR();
+        PROCPRINTF("fgets_result вернул NULL, нихуя себе!\n");
+        PROCGETCHAR();
 
         return CPU_ERR;
     }
 }
 
 cpu_status  out_asm(cpu_struct* cpu) {
-    PRINTF("Текущий байт байткода: [%lld]\n", cpu->instruction_pointer);
+    PROCPRINTF("Текущий байт байткода: [%lld]\n", cpu->instruction_pointer);
 
     STACK_DATA_TYPE value_to_out = 0;
     defended_stack* ptr_on_cpu_calc_stack = cpu->calculations_stack;
 
-    cpu_status stack_dup_status = dup_asm(cpu);
+    cpu_status      stack_dup_status = dup_asm(cpu);
 
     if (stack_dup_status == CPU_FINE) {
-        PRINTF(GREEN "Успешно " RESET "сдублировал число\n");
-        GETCHAR();
+        PROCPRINTF(GREEN "Успешно " RESET "сдублировал число\n");
+        PROCGETCHAR();
 
         stack_potential_error stack_pop_status = stack_pop(ptr_on_cpu_calc_stack, &value_to_out);
         if (stack_pop_status == OK) {
-            fprintf(stdout, "ласт число из стэка: " PURPLE "[%lf]\n" RESET, value_to_out);
+            
+            fprintf(stdout, GREEN "ЛАСТ ЧИСЛО ИЗ СТЭКА: " RESET PURPLE "[%lf]\n" RESET, value_to_out);
 
             // cpu->instruction_pointer += sizeof(uint8_t);
             // NOTE - здесь не нужен шаг +1 поскольку мы его сделали внутри dup_asm
@@ -692,7 +713,7 @@ cpu_status  out_asm(cpu_struct* cpu) {
 }
 
 cpu_status  hlt_asm(cpu_struct* cpu) {
-    PRINTF("Текущий байт байткода: <%lld>\n", cpu->instruction_pointer);
+    PROCPRINTF("Текущий байт байткода: <%lld>\n", cpu->instruction_pointer);
 
     return CPU_HLT;
 }
@@ -700,23 +721,30 @@ cpu_status  hlt_asm(cpu_struct* cpu) {
 // ----------------------------------------------------------------------------------------------------------------
 
 cpu_status  dup_asm(cpu_struct* cpu) {
-    PRINTF("Текущий байт байткода: [%lld]\n", cpu->instruction_pointer);
+    PROCPRINTF("Текущий байт байткода: [%lld]\n", cpu->instruction_pointer);
 
     STACK_DATA_TYPE value_to_dup = 0;
     defended_stack* ptr_on_cpu_calc_stack = cpu->calculations_stack;
 
+    
+
     stack_potential_error stack_pop_status = stack_pop(ptr_on_cpu_calc_stack, &value_to_dup);
 
     if (stack_pop_status == OK) {
-        PRINTF("Что я сохранил в value_to_dup из стэка: [%lf]\n", value_to_dup);
-        GETCHAR();
+        PROCPRINTF("Что я сохранил в value_to_dup из стэка: [%lf]\n", value_to_dup);
+        PROCGETCHAR();
         
         stack_potential_error stack_push_first_status  = stack_push(ptr_on_cpu_calc_stack, value_to_dup);
         stack_potential_error stack_push_second_status = stack_push(ptr_on_cpu_calc_stack, value_to_dup);
-        cpu_status err_code = finish_instruction(cpu, stack_push_first_status, 0); 
 
-        if (err_code != CPU_FINE) { return err_code; }
-        else                      { return finish_instruction(cpu, stack_push_second_status, sizeof(uint8_t)); }
+        
+        // cpu_status err_code = finish_instruction(cpu, stack_push_first_status, 0); 
+
+        if (stack_push_first_status != OK) { return CPU_ERR; }
+        else { 
+            
+            return finish_instruction(cpu, stack_push_second_status, sizeof(uint8_t)); 
+        }
 
     }
 
@@ -724,34 +752,39 @@ cpu_status  dup_asm(cpu_struct* cpu) {
 }
 
 cpu_status  cmp_asm(cpu_struct* cpu) {
-    PRINTF("Текущий байт байткода: [%lld]\n", cpu->instruction_pointer);
+    PROCPRINTF("Текущий байт байткода: [%lld]\n", cpu->instruction_pointer);
 
     defended_stack* ptr_on_cpu_calc_stack = cpu->calculations_stack;
 
-    STACK_DATA_TYPE value_a_to_cmp_from_stack = 0;
-    STACK_DATA_TYPE value_b_to_cmp_from_stack = 0; // собственно пока CMP имеет именно такой смысл!
+    STACK_DATA_TYPE value_a_to_cmp_from_stack = 0; // 5
+    STACK_DATA_TYPE value_b_to_cmp_from_stack = 0; // 3
+
+    /*
+    5
+    3  ---> CMP 5 3
+    */
 
     stack_potential_error stack_pop_status_a = stack_pop(ptr_on_cpu_calc_stack, &value_a_to_cmp_from_stack);
     stack_potential_error stack_pop_status_b = stack_pop(ptr_on_cpu_calc_stack, &value_b_to_cmp_from_stack);
 
     if (stack_pop_status_a == OK && stack_pop_status_b == OK) {
-        stack_dump(ptr_on_cpu_calc_stack);
-
-        PRINTF(YELLOW "Вот что я сохранил в value_a: [%lf]\n", value_a_to_cmp_from_stack);
-        PRINTF("Вот что я сохранил в value_b: [%lf]\n" RESET,  value_b_to_cmp_from_stack);
-        GETCHAR();
         
-        if      (value_b_to_cmp_from_stack < value_a_to_cmp_from_stack) { cpu->cmp_flag = BELOW; }
-        else if (value_b_to_cmp_from_stack > value_a_to_cmp_from_stack) { cpu->cmp_flag = ABOVE; }
+
+        PROCPRINTF(YELLOW "Вот что я сохранил в value_a: [%lf]\n", value_a_to_cmp_from_stack);
+        PROCPRINTF("Вот что я сохранил в value_b: [%lf]\n" RESET,  value_b_to_cmp_from_stack);
+        PROCGETCHAR();
+        
+        if      (value_a_to_cmp_from_stack > value_b_to_cmp_from_stack) { cpu->cmp_flag = ABOVE; }
+        else if (value_a_to_cmp_from_stack < value_b_to_cmp_from_stack) { cpu->cmp_flag = BELOW; }
         else                                                            { cpu->cmp_flag = EQUAL; }
 
         stack_potential_error stack_push_b_status = stack_push(ptr_on_cpu_calc_stack, value_b_to_cmp_from_stack);
         stack_potential_error stack_push_a_status = stack_push(ptr_on_cpu_calc_stack, value_a_to_cmp_from_stack);
 
         if (stack_push_b_status == OK && stack_push_a_status == OK) { 
-            stack_dump(ptr_on_cpu_calc_stack);
-            PRINTF("Запушил два числа с сохранением порядка\n");
-            GETCHAR();
+            
+            PROCPRINTF("Запушил два числа с сохранением порядка\n");
+            PROCGETCHAR();
 
             cpu->instruction_pointer += sizeof(uint8_t);
 
@@ -763,6 +796,64 @@ cpu_status  cmp_asm(cpu_struct* cpu) {
 
     else { return CPU_ERR; }
 }
+
+cpu_status  over_asm(cpu_struct* cpu) {
+    PROCPRINTF("Текущий байт байткода: [%lld]\n", cpu->instruction_pointer);
+
+    STACK_DATA_TYPE value_a = 0;
+    STACK_DATA_TYPE value_b = 0;
+    /* 
+    1 - последний
+    2 - предпоследний
+    */
+    defended_stack* ptr_on_cpu_calc_stack = cpu->calculations_stack;
+    
+    stack_potential_error stack_pop_a_status = stack_pop(ptr_on_cpu_calc_stack, &value_a); // 1
+    stack_potential_error stack_pop_b_status = stack_pop(ptr_on_cpu_calc_stack, &value_b); // 2
+
+    if ((stack_pop_a_status == OK) && (stack_pop_b_status == OK)) {
+        stack_potential_error stack_push_1_status = stack_push(ptr_on_cpu_calc_stack, value_b);
+        stack_potential_error stack_push_2_status = stack_push(ptr_on_cpu_calc_stack, value_a);
+        stack_potential_error stack_push_3_status = stack_push(ptr_on_cpu_calc_stack, value_b);
+
+        if (stack_push_1_status != OK) { return CPU_ERR; }
+        if (stack_push_2_status != OK) { return CPU_ERR; }
+
+        return finish_instruction(cpu, stack_push_3_status, 1);
+    }
+
+    else { return CPU_ERR; }
+}
+
+cpu_status  swap_asm(cpu_struct* cpu) {
+    PROCPRINTF("Текущий байт байткода: [%lld]\n", cpu->instruction_pointer);
+
+    STACK_DATA_TYPE value_a = 0;
+    STACK_DATA_TYPE value_b = 0;
+    /* 
+    5
+    3
+    */
+    defended_stack* ptr_on_cpu_calc_stack = cpu->calculations_stack;
+    
+    stack_potential_error stack_pop_a_status = stack_pop(ptr_on_cpu_calc_stack, &value_a); // 5
+    stack_potential_error stack_pop_b_status = stack_pop(ptr_on_cpu_calc_stack, &value_b); // 3
+
+    if ((stack_pop_a_status == OK) && (stack_pop_b_status == OK)) {
+        stack_potential_error stack_push_1_status = stack_push(ptr_on_cpu_calc_stack, value_a);
+        stack_potential_error stack_push_2_status = stack_push(ptr_on_cpu_calc_stack, value_b);
+
+        if (stack_push_1_status != OK) { return CPU_ERR; }
+
+        return finish_instruction(cpu, stack_push_2_status, 1);
+    }
+
+    else { return CPU_ERR; }
+}
+
+// FIXME - много копипасты у следующих функций:
+// FIXME - add, sub, mul, div
+// FIXME - push, over, swap
 
 // ----------------------------------------------------------------------------------------------------------------
 
@@ -810,14 +901,14 @@ cpu_struct* initialize_cpu_struct(const char* filename, size_t bytes_read_from_b
         }
 
         else {
-            PRINTF("говорит функция initialize_cpu_struct!\nМы блять недосчитались команд или аргументов!\n");
+            PROCPRINTF("говорит функция initialize_cpu_struct!\nМы блять недосчитались команд или аргументов!\n");
 
             return NULL;
         }
     }
 
     else {
-        PRINTF("говорит функция initialize_cpu_struct!\nфайл блять не открылся!\n");
+        PROCPRINTF("говорит функция initialize_cpu_struct!\nфайл блять не открылся!\n");
 
         return NULL;
     }
@@ -830,12 +921,14 @@ size_t      get_bytes_in_bin_amount(const char* filename) {
 
     if (stat(filename, &file_info) == 0) {
         off_t file_size = file_info.st_size;
+        PROCPRINTF("[%lld], file_size\n", file_size);
+        PROCGETCHAR();
 
         if (file_size > 0) { return (size_t)file_size; }
 
         else { 
-            PRINTF("filesize <= 0 (функция get_bytes_in_bin_amount)\n"); 
-            GETCHAR(); 
+            PROCPRINTF("filesize <= 0 (функция get_bytes_in_bin_amount)\n"); 
+            PROCGETCHAR(); 
             
             return 0; 
         }
@@ -856,39 +949,41 @@ cpu_status  cpu_work_cycle(cpu_struct* cpu) {
 
         // NOTE - каждый раз начинаю с КОМАНДЫ, 1 это байт ансайн чар
 
-        PRINTF("<%u> что я только что вытащил?\n", what_we_are_executing);
-        GETCHAR();
+        PROCPRINTF("<%u> что я только что вытащил?" PURPLE " UNSIGNED\n" RESET, what_we_are_executing);
+        PROCGETCHAR();
 
         uint8_t our_current_opcode = what_we_are_executing & OPCODE_MASKA;
 
-        PRINTF("опкод который полулилось вытащить: <%u>\n", our_current_opcode);
-        GETCHAR();
+        PROCPRINTF(GREEN "OPCODE" RESET " который полулилось вытащить: <%u>\n", our_current_opcode);
+        PROCGETCHAR();
 
         uint8_t opcode_index_in_array = our_current_opcode - 1; // минимальный our_current_opcode равен единице, поэтому index_in_array при нормальной работе должен быть равен 0
 
         if (opcode_index_in_array >= 0 && opcode_index_in_array <= FUNCS_AMOUNT) {
-            PRINTF("Всё нормально (cpu_work_cycle)\n");
-            GETCHAR();
+            PROCPRINTF("Всё нормально! " ORANGE "(cpu_work_cycle)\n" RESET);
+            PROCGETCHAR();
 
             cpu_status renew_status_after_command = asm_funcs[opcode_index_in_array](cpu);
 
             if (renew_status_after_command == CPU_HLT) {
-                PRINTF(GREEN "Мы дошли до хальт. Ниче стращного щас просто ебнем програмку и всё.\n" RESET);
+                PROCPRINTF(GREEN "Мы дошли до хальт. Ниче стращного щас просто ебнем програмку и всё.\n" RESET);
 
                 cpu->processor_status = CPU_HLT; // в структурку всё таки это надо записать
                 return CPU_HLT;
             }
 
             else if (renew_status_after_command == CPU_ERR) {
-                PRINTF("ПРОИЗОШЛА ОШИБКА! ПИЗДЕЦ! Да шучу я. всё фиксится. Код функции, после которой произошел бум: [%lld]\n", cpu->instruction_pointer);
+                PROCPRINTF("ПРОИЗОШЛА ОШИБКА! ПИЗДЕЦ! Да шучу я. всё фиксится. Код функции, после которой произошел бум: [%lld]\n", cpu->instruction_pointer);
 
                 cpu->processor_status = CPU_ERR;
                 return CPU_ERR;
             }
+
+            cpu_stack_dump(cpu, CALC_STACK);
         }
 
         else {
-            PRINTF("Тут какие варианты. 99 процентов что цикл работает неправильно (виноват разработчик," 
+            PROCPRINTF("Тут какие варианты. 99 процентов что цикл работает неправильно (виноват разработчик)," 
                    "и 1 процент что мы реально наткнулись на неизвестную команду\n");
 
             cpu->processor_status = CPU_UNK_CMD;
@@ -896,7 +991,7 @@ cpu_status  cpu_work_cycle(cpu_struct* cpu) {
         }
     }
 
-    PRINTF("До сюда мы не должны были дойти, поэтому это необработанный случай\n");
+    PROCPRINTF("До сюда мы не должны были дойти, поэтому это необработанный случай\n");
     cpu->processor_status = CPU_UNCHECKED_CASE;
 
     return CPU_UNCHECKED_CASE;
@@ -906,8 +1001,8 @@ cpu_status  check_whole_number(STACK_DATA_TYPE number) {
     STACK_DATA_TYPE number_rounded = round(number);
 
     if (fabs(number - number_rounded) > EPSILON) {
-        PRINTF("От округленного числа number отличается больше, чем на EPSILON\n");
-        GETCHAR();
+        PROCPRINTF("От округленного числа number отличается больше, чем на EPSILON\n");
+        PROCGETCHAR();
 
         return NUMBER_IS_NOT_WHORE;
     }
@@ -917,14 +1012,14 @@ cpu_status  check_whole_number(STACK_DATA_TYPE number) {
 
 cpu_status  validate_videoram_index(STACK_DATA_TYPE number) {
     if (fabs(number - 0) < EPSILON && fabs(number - RAM_MB) < EPSILON) {
-        PRINTF("индекс допустимый\n");
-        GETCHAR();
+        PROCPRINTF("индекс допустимый\n");
+        PROCGETCHAR();
 
         return CPU_FINE;
     }
 
     else {
-        PRINTF("validate_videoram_index - индекс недопустимый для адрессации к массиву видеопамяти: <%lf>\n", number);
+        PROCPRINTF("validate_videoram_index - индекс недопустимый для адрессации к массиву видеопамяти: <%lf>\n", number);
         
         return INVALID_VIDEORAM_INDEX;
     }
@@ -933,27 +1028,45 @@ cpu_status  validate_videoram_index(STACK_DATA_TYPE number) {
 void        cpu_code_array_dump(cpu_struct* cpu, size_t size_of_array) {
     assert(cpu);
 
-    printf(DARK_PURPLE "==============================================================================================================\n");
+    PROCPRINTF(DARK_PURPLE "========================================================================================================================\n");
 
-    PRINTF("CPU CURR INST: [%lld]\n", cpu->instruction_pointer);
+    PROCPRINTF("CPU CURR INST: [%lld]\n", cpu->instruction_pointer);
 
-    for (size_t i = 0; i < size_of_array; i++) {
-        if (i == cpu->instruction_pointer) {
-            printf(PURPLE "<%u>\n" RESET, (cpu->code)[i]);
+    long long j = 0;
+
+    for (long long i = 0; i < size_of_array; i++) {
+        if (j % 16 == 15) {
+            if (i == cpu->instruction_pointer) { PROCPRINTF(PURPLE "<%u>\n" RESET, (cpu->code)[i]); }
+            else                               { PROCPRINTF(DARK_PURPLE "<%u>\n", (cpu->code)[i]);  }
         }
 
         else {
-            printf(DARK_PURPLE "<%u>\n", (cpu->code)[i]);
+            if ((cpu->code)[i] > 99) {
+                if (i == cpu->instruction_pointer) { PROCPRINTF(PURPLE "<%u>  " RESET, (cpu->code)[i]); }
+                else                               { PROCPRINTF(DARK_PURPLE "<%u>  ", (cpu->code)[i]);  }
+            }
+
+            else if ((cpu->code)[i] > 9) {
+                if (i == cpu->instruction_pointer) { PROCPRINTF(PURPLE "<%u>   " RESET, (cpu->code)[i]); }
+                else                               { PROCPRINTF(DARK_PURPLE "<%u>   ", (cpu->code)[i]);  }
+            }
+
+            else {
+                if (i == cpu->instruction_pointer) { PROCPRINTF(PURPLE "<%u>    " RESET, (cpu->code)[i]); }
+                else                               { PROCPRINTF(DARK_PURPLE "<%u>    ", (cpu->code)[i]);  }
+            }
         }
+
+        j++;
     }
 
-    printf("\n");
-    printf(    "==============================================================================================================\n" RESET);
+    PROCPRINTF("\n");
+    PROCPRINTF(DARK_PURPLE "========================================================================================================================\n" RESET);
 }
 
 stack_potential_error cpu_stack_dump(cpu_struct* cpu, stack_consts stack_mode) {
     if (stack_mode == CALL_STACK) {
-        PRINTF("осуществляю распечатку в режиме CALL_STACK\n");
+        PROCPRINTF("осуществляю распечатку в режиме CALL_STACK\n");
         defended_stack* ptr_on_call_stack = cpu->call_stack;
 
         stack_potential_error stack_dump_processing = stack_dump(ptr_on_call_stack);
@@ -962,7 +1075,7 @@ stack_potential_error cpu_stack_dump(cpu_struct* cpu, stack_consts stack_mode) {
     }
 
     else if (stack_mode == CALC_STACK) {
-        PRINTF("осуществляю распечатку в режиме CALC_STACK\n");
+        PROCPRINTF("осуществляю распечатку в режиме CALC_STACK\n");
         defended_stack* ptr_on_calc_stack = cpu->calculations_stack;
 
         stack_potential_error stack_dump_processing = stack_dump(ptr_on_calc_stack);
@@ -971,7 +1084,7 @@ stack_potential_error cpu_stack_dump(cpu_struct* cpu, stack_consts stack_mode) {
     }
 
     else { 
-        PRINTF("нераспознанный режим распечатки. у нас их всего два: CALL_STACK, CALC_STACK\n");
+        PROCPRINTF("нераспознанный режим распечатки. у нас их всего два: CALL_STACK, CALC_STACK\n");
 
         return UNDEFINED_CPU_STACK_DUMP_MODE;
     }

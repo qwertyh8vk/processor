@@ -67,7 +67,7 @@
 #define MAX_LABELS_AMOUNT 128
 #define MAX_LINE          256
 
-#define ON_DEBUG
+// #define ON_DEBUG
 
 #ifdef  ON_DEBUG
     #define PRINTF(...) printf(__VA_ARGS__)
@@ -89,6 +89,11 @@ enum datatype {
 enum progon_index {
     FIRST  = 1,
     SECOND = 2,
+};
+
+enum string_type {
+    EMPTY     = 1,
+    NOT_EMPTY = 2,
 };
 
 enum potential_error  {
@@ -168,6 +173,8 @@ potential_error validate_zero_operands_commands(char*              command_line_
                                                 long long*         bytecode_capacity); 
 
 potential_error check_string_after_arg(char* command_line_ptr); 
+
+string_type     check_if_string_empty(char* string_to_check, int string_length);
 
 potential_error validate_commands_only_labels(char*              command_line_ptr, 
                                               long long*         labels_array, 

@@ -58,8 +58,8 @@ void recalculate_hash_after_func(defended_stack* pointer_on_stack) {
     uint32_t hash_sdt_recounted        = djb2_calculate_hash(pointer_on_stack->ptr_on_array, ((pointer_on_stack->capacity + 2) * sizeof(STACK_DATA_TYPE)));
     uint32_t hash_struct_recounted     = djb2_calculate_for_rewrite_struct_hash(pointer_on_stack);
 
-    PRINTF("Новый " GREEN "пересчитанный " RESET "хэш структуры: [%u]\n", hash_struct_recounted);
-    GETCHAR();
+    STACKPRINTF("Новый " GREEN "пересчитанный " RESET "хэш структуры: [%u]\n", hash_struct_recounted);
+    STACKGETCHAR();
 
     pointer_on_stack->struct_hash      = hash_struct_recounted;
     pointer_on_stack->sdt_pointer_hash = hash_sdt_recounted;
@@ -76,15 +76,15 @@ stack_potential_error stack_verify(defended_stack* pointer_on_stack, stack_funct
             uint32_t struct_hash = djb2_calculate_for_check_struct_hash(pointer_on_stack);
             uint32_t array_hash  = djb2_calculate_hash(pointer_on_stack->ptr_on_array, ((pointer_on_stack->capacity + 2) * sizeof(STACK_DATA_TYPE)));
             
-            PRINTF(RED "=================================================================\n" RESET);
-            PRINTF("Вызван из функции: [%d]\n", func);
-            PRINTF("Хэш структуры, который посчитала функция djb2_calculate_for_check_struct_hash: [%u]\n", struct_hash);
-            PRINTF("Хэш структуры, который сохранил стэк: [%u]\n", pointer_on_stack->struct_hash);
-            PRINTF("---------------------------------------------------------------------\n");
-            PRINTF("Хэш массива, который посчитала функция djb2_calculate_hash: [%u]\n", array_hash);
-            PRINTF("Хэш массива, который сохранил стэк: [%u]\n", pointer_on_stack->sdt_pointer_hash);
-            PRINTF(RED "=================================================================\n" RESET);
-            GETCHAR();
+            // STACKPRINTF(RED "=================================================================\n" RESET);
+            // STACKPRINTF("Вызван из функции: [%d]\n", func);
+            // STACKPRINTF("Хэш структуры, который посчитала функция djb2_calculate_for_check_struct_hash: [%u]\n", struct_hash);
+            // STACKPRINTF("Хэш структуры, который сохранил стэк: [%u]\n", pointer_on_stack->struct_hash);
+            // STACKPRINTF("---------------------------------------------------------------------\n");
+            // STACKPRINTF("Хэш массива, который посчитала функция djb2_calculate_hash: [%u]\n", array_hash);
+            // STACKPRINTF("Хэш массива, который сохранил стэк: [%u]\n", pointer_on_stack->sdt_pointer_hash);
+            // STACKPRINTF(RED "=================================================================\n" RESET);
+            // STACKGETCHAR();
 
             if (struct_hash != (pointer_on_stack->struct_hash)) {
                 return STACK_INCORRECT_STRUCT_HASH;
@@ -130,7 +130,7 @@ stack_potential_error stack_verify(defended_stack* pointer_on_stack, stack_funct
                 break;
 
             default:
-                printf(RED  "АЛАРМ!!!!! НЕОБРАБОТАННЫЙ СЛУЧАЙ\n"
+                STACKPRINTF(RED  "АЛАРМ!!!!! НЕОБРАБОТАННЫЙ СЛУЧАЙ\n"
                             "АЛАРМ!!!!! НЕОБРАБОТАННЫЙ СЛУЧАЙ\n"
                             "АЛАРМ!!!!! НЕОБРАБОТАННЫЙ СЛУЧАЙ\n" RESET);
                 break;
@@ -170,9 +170,9 @@ defended_stack* stack_init(size_t wished_capacity) {
             stack_waits_to_be_initialized->struct_hash        =  djb2_calculate_for_rewrite_struct_hash(stack_waits_to_be_initialized); // переставить вниз ещё раз. вниз = после calculate_hash.
             stack_waits_to_be_initialized->sdt_pointer_hash   =  djb2_calculate_hash(stack_waits_to_be_initialized->ptr_on_array, (wished_capacity + 2) * sizeof(STACK_DATA_TYPE));
 
-            PRINTF(BLUE "что там у нас по хэшу массива? [%u] \n" RESET, stack_waits_to_be_initialized->sdt_pointer_hash);
-            PRINTF(BLUE "а что насчёт хэша структуры? [%u] \n" RESET, stack_waits_to_be_initialized->struct_hash);
-            GETCHAR();         
+            STACKPRINTF(BLUE "что там у нас по хэшу массива? [%u] \n" RESET, stack_waits_to_be_initialized->sdt_pointer_hash);
+            STACKPRINTF(BLUE "а что насчёт хэша структуры? [%u] \n" RESET, stack_waits_to_be_initialized->struct_hash);
+            STACKGETCHAR();         
 
         }
 
@@ -192,38 +192,38 @@ stack_potential_error stack_push(defended_stack* pointer_on_stack, STACK_DATA_TY
 
     if (basic_stack_verify == OK) {
 
-        PRINTF("===========================================================\n");
-        PRINTF(RED "ЗАНУЛИЛ " RESET "pointer_on_array'скую переменную значения поля стэка\n"
+        STACKPRINTF("===========================================================\n");
+        STACKPRINTF(RED "ЗАНУЛИЛ " RESET "pointer_on_array'скую переменную значения поля стэка\n"
             "<%p> значение адреса сохранённое\n", pointer_on_array);
 
-        PRINTF(GREEN "ПРОВЕРИМ " RESET "значение поля стэка\n"
+        STACKPRINTF(GREEN "ПРОВЕРИМ " RESET "значение поля стэка\n"
             "<%p> значение адреса из ПОЛЯ СТЭКА\n", pointer_on_stack->ptr_on_array);
-        PRINTF("===========================================================\n");
-        GETCHAR();
+        STACKPRINTF("===========================================================\n");
+        STACKGETCHAR();
 
         if (pointer_on_stack->size > pointer_on_stack->capacity - 1) { // check
-            PRINTF(RED "СЕЙЧАС я попал на последний НЕ канареешный элемент массива!\n" RESET);
-            GETCHAR();
+            STACKPRINTF(RED "СЕЙЧАС я попал на последний НЕ канареешный элемент массива!\n" RESET);
+            STACKGETCHAR();
             STACK_DATA_TYPE* temp_pointer_for_safety = (STACK_DATA_TYPE* )realloc(pointer_on_stack->ptr_on_array, 
                                                                                    ((pointer_on_stack->capacity + 2) * sizeof(STACK_DATA_TYPE) * INCREASE_COEFF));
             if (temp_pointer_for_safety != NULL) {
                 pointer_on_stack->ptr_on_array = temp_pointer_for_safety;
 
-                PRINTF("===========================================================\n");
-                PRINTF(GREEN "ПРОВЕРИМ " RESET "переменную pointer_on_array\n"
+                STACKPRINTF("===========================================================\n");
+                STACKPRINTF(GREEN "ПРОВЕРИМ " RESET "переменную pointer_on_array\n"
                        "<%p> значение адреса сохранённое\n", pointer_on_array);
 
-                PRINTF(GREEN "ПРОВЕРИМ " RESET "значение поля стэка\n"
+                STACKPRINTF(GREEN "ПРОВЕРИМ " RESET "значение поля стэка\n"
                            "<%p> значение адреса из ПОЛЯ СТЭКА\n", pointer_on_stack->ptr_on_array);
-                PRINTF("===========================================================\n");
-                GETCHAR();
+                STACKPRINTF("===========================================================\n");
+                STACKGETCHAR();
             
                 pointer_on_array = pointer_on_stack->ptr_on_array;
 
-                PRINTF("===========================================================\n");
-                PRINTF(RED "ПОВТОРНО ПРОВЕРИМ " RESET "переменную pointer_on_array\n"
+                STACKPRINTF("===========================================================\n");
+                STACKPRINTF(RED "ПОВТОРНО ПРОВЕРИМ " RESET "переменную pointer_on_array\n"
                        "<%p> значение адреса сохранённое\n", pointer_on_array);
-                PRINTF("===========================================================\n");
+                STACKPRINTF("===========================================================\n");
 
                 pointer_on_array[pointer_on_stack->size]           = push_value;   // записали дуру
                 pointer_on_array[pointer_on_stack->size + 1]       = POISON_VALUE; // Там, где была канарейка, теперь отравленное значение.
@@ -247,10 +247,10 @@ stack_potential_error stack_push(defended_stack* pointer_on_stack, STACK_DATA_TY
 
         else {
             pointer_on_array = pointer_on_stack->ptr_on_array;
-            PRINTF("===========================================================\n");
-            PRINTF(RED "ПОВТОРНО ПРОВЕРИМ " RESET "переменную pointer_on_array\n"
+            STACKPRINTF("===========================================================\n");
+            STACKPRINTF(RED "ПОВТОРНО ПРОВЕРИМ " RESET "переменную pointer_on_array\n"
                 "<%p> значение адреса сохранённое\n", pointer_on_array);
-            PRINTF("===========================================================\n");
+            STACKPRINTF("===========================================================\n");
             pointer_on_array[pointer_on_stack->size] = push_value;
             pointer_on_stack->size += 1;
         }
@@ -262,8 +262,8 @@ stack_potential_error stack_push(defended_stack* pointer_on_stack, STACK_DATA_TY
         }
 
         recalculate_hash_after_func(pointer_on_stack);
-        PRINTF("recalculating hash from stack_push...\n");
-        GETCHAR();
+        STACKPRINTF("recalculating hash from stack_push...\n");
+        STACKGETCHAR();
 
         return check_birdies_in_end;
     }
@@ -277,12 +277,6 @@ stack_potential_error stack_pop(defended_stack* pointer_on_stack, STACK_DATA_TYP
     stack_potential_error basic_stack_verify = STACK_VERIFY(pointer_on_stack, STACK_POP);
 
     if (basic_stack_verify == OK) {
-        // if (variable == NULL) {
-        //     LOGPRINTF(pointer_on_stack, STACK_NULL_POINTER_ERROR, STACK_POP);
-
-        //     return STACK_NULL_POINTER_ERROR;
-        // }
-
         if (pointer_on_stack->size <= 1) {
             LOGPRINTF(pointer_on_stack, STACK_LEFT_END_OF_ARRAY, STACK_POP);
 
@@ -300,8 +294,8 @@ stack_potential_error stack_pop(defended_stack* pointer_on_stack, STACK_DATA_TYP
             }
 
             else {
-                PRINTF(PURPLE "Отладочный принтф, запись не осуществляется.\n" RESET);
-                GETCHAR();
+                STACKPRINTF(PURPLE "Отладочный принтф, запись не осуществляется.\n" RESET);
+                STACKGETCHAR();
             }
             
             if ((pointer_on_stack->size <= (pointer_on_stack->capacity / 4) + 1) && pointer_on_stack->capacity > 4) {
@@ -333,8 +327,8 @@ stack_potential_error stack_pop(defended_stack* pointer_on_stack, STACK_DATA_TYP
             }
 
             recalculate_hash_after_func(pointer_on_stack);
-            PRINTF("recalculating hash from stack_pop...\n");
-            GETCHAR();
+            STACKPRINTF("recalculating hash from stack_pop...\n");
+            STACKGETCHAR();
 
             return check_birdies_in_end;
         }
@@ -368,35 +362,35 @@ stack_potential_error logprintf(defended_stack* pointer_on_stack, stack_potentia
         if (error_code != OK) {
             switch (func) {
                 case STACK_INIT:
-                    printf(RED "Ошибка прокнулась в функции stack_init.\n"    RESET);
+                    STACKPRINTF(RED "Ошибка прокнулась в функции stack_init.\n"    RESET);
                     break;
 
                 case STACK_PUSH:
-                    printf(RED "Ошибка прокнулась в функции stack_push.\n"    RESET);
+                    STACKPRINTF(RED "Ошибка прокнулась в функции stack_push.\n"    RESET);
                     break;
 
                 case STACK_POP:
-                    printf(RED "Ошибка прокнулась в функции stack_pop.\n"     RESET);
+                    STACKPRINTF(RED "Ошибка прокнулась в функции stack_pop.\n"     RESET);
                     break;
 
                 case STACK_DESTROY:
-                    printf(RED "Ошибка прокнулась в функции stack_destroy.\n" RESET);
+                    STACKPRINTF(RED "Ошибка прокнулась в функции stack_destroy.\n" RESET);
                     break;
 
                 case STACK_DUMP:
-                    printf(RED "Ошибка прокнулась в функции stack_dump.\n"    RESET);
+                    STACKPRINTF(RED "Ошибка прокнулась в функции stack_dump.\n"    RESET);
                     break;
 
                 case LOGPRINTF: // рекурсия пошла уже какая-то страшная
                 default:
-                    printf(RED "АЛАРМ!!!!! НЕОБРАБОТАННЫЙ СЛУЧАЙ\n"
+                    STACKPRINTF(RED "АЛАРМ!!!!! НЕОБРАБОТАННЫЙ СЛУЧАЙ\n"
                                 "АЛАРМ!!!!! НЕОБРАБОТАННЫЙ СЛУЧАЙ\n"
                                 "АЛАРМ!!!!! НЕОБРАБОТАННЫЙ СЛУЧАЙ\n" RESET);
                     break;
             }
 
-            printf(RED "Код ошибки: [%d]\n" RESET, error_code);
-            getchar();
+            STACKPRINTF(RED "Код ошибки: [%d]\n" RESET, error_code);
+            STACKGETCHAR();
         }
     
         stack_dump(pointer_on_stack);
@@ -404,8 +398,8 @@ stack_potential_error logprintf(defended_stack* pointer_on_stack, stack_potentia
         return OK;
     }
 
-    printf(RED "\nОшибка произошла в САМОЙ функции logprintf.\n" RESET);
-    printf(RED "Код ошибки: [%d]\n\n" RESET, basic_stack_verify);
+    STACKPRINTF(RED "\nОшибка произошла в САМОЙ функции logprintf.\n" RESET);
+    STACKPRINTF(RED "Код ошибки: [%d]\n\n" RESET, basic_stack_verify);
 
     return basic_stack_verify;
 }
@@ -443,31 +437,32 @@ stack_potential_error stack_dump(defended_stack* pointer_on_stack) {
     stack_potential_error basic_stack_verify = STACK_VERIFY(pointer_on_stack, STACK_DUMP);
 
     if (basic_stack_verify == OK) {
-        printf("-----------------------------------------------------------\n");
-        printf(RED "значение хэша СТРУКТУРЫ: [%u]\n" RESET, pointer_on_stack->struct_hash);
-        printf(RED "значение хэша МАССИВА: [%u]\n" RESET, pointer_on_stack->sdt_pointer_hash);
-        printf("указатель дабловского массива: <%p>\n", pointer_on_stack->ptr_on_array);
-        printf(GREEN "размер массива без учёта канареек: <%zu>\n\n" RESET, pointer_on_stack->capacity);
+        STACKPRINTF("-----------------------------------------------------------\n");
+        STACKPRINTF(RED "значение хэша СТРУКТУРЫ: [%u]\n" RESET, pointer_on_stack->struct_hash);
+        STACKPRINTF(RED "значение хэша МАССИВА: [%u]\n" RESET, pointer_on_stack->sdt_pointer_hash);
+        STACKPRINTF("указатель дабловского массива: <%p>\n", pointer_on_stack->ptr_on_array);
+        STACKPRINTF(GREEN "размер массива без учёта канареек: <%zu>\n\n" RESET, pointer_on_stack->capacity);
 
         STACK_DATA_TYPE* ptr_on_array = pointer_on_stack->ptr_on_array;
 
         if (ptr_on_array != POISON) {
-            for (size_t i = 0; i < pointer_on_stack->capacity + 2; i++) {
-                printf(BLUE "число: [%lf], индекс: [%zu]\n" RESET, ptr_on_array[i], i);
+            for (long long i = (long long)(pointer_on_stack->capacity + 1); i >= 0; i--) {
+                if (i >= 0) { STACKPRINTF(BLUE "число: [%lf], индекс: [%lld]\n" RESET, ptr_on_array[i], i); }
+                else        { return STACK_LEFT_END_OF_ARRAY; }
             }
         }
 
         else {
-            printf(RED "не могу распечатать элементы по отравленному указателю.\n" RESET);
+            STACKPRINTF(RED "не могу распечатать элементы по отравленному указателю.\n" RESET);
         }
 
-        printf("\n");
-        printf(GREEN "индекс самого первого свободного элемента: <%zu>\n" RESET, pointer_on_stack->size);
-        printf("ожидаемое значение канарейки слева: <%lf>\n", pointer_on_stack->canary_left);
-        printf("ожидаемое значение канарейки справа: <%lf> \n", pointer_on_stack->canary_right);
-        printf(YELLOW "статус стэка: <%d>\n" RESET, pointer_on_stack->status_code);
-        printf("-----------------------------------------------------------\n");
-        getchar();
+        STACKPRINTF("\n");
+        STACKPRINTF(GREEN "индекс самого первого свободного элемента: <%zu>\n" RESET, pointer_on_stack->size);
+        STACKPRINTF("ожидаемое значение канарейки слева: <%lf>\n", pointer_on_stack->canary_left);
+        STACKPRINTF("ожидаемое значение канарейки справа: <%lf> \n", pointer_on_stack->canary_right);
+        STACKPRINTF(YELLOW "статус стэка: <%d>\n" RESET, pointer_on_stack->status_code);
+        STACKPRINTF("-----------------------------------------------------------\n");
+        STACKGETCHAR();
 
         if (pointer_on_stack->status_code != DESTROYED) {
             stack_potential_error check_birdies_in_end = stack_validate_birds(pointer_on_stack);
@@ -478,9 +473,9 @@ stack_potential_error stack_dump(defended_stack* pointer_on_stack) {
         return OK;
     }
 
-    printf(YELLOW "\nОшибка произошла непосредственно в stack_dump\n" RESET);
-    printf(YELLOW "Код ошибки: [%d]\n\n" RESET, basic_stack_verify);
-    getchar();
+    STACKPRINTF(YELLOW "\nОшибка произошла непосредственно в stack_dump\n" RESET);
+    STACKPRINTF(YELLOW "Код ошибки: [%d]\n\n" RESET, basic_stack_verify);
+    STACKGETCHAR();
 
     return basic_stack_verify;
 }

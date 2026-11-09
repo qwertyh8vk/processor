@@ -27,6 +27,8 @@ enum asm_commands_nums : uint8_t {
 	HLT_ASM  = 19,
 	DUP_ASM  = 20,
 	CMP_ASM  = 21,
+	OVER_ASM = 22,
+	SWAP_ASM = 23,
 };
 
 enum commands_hash {
@@ -51,6 +53,8 @@ enum commands_hash {
 	HLT  = 193457997,
 	DUP  = 193453934,
 	CMP  = 193452581,
+	OVER = 2089408641,
+	SWAP = 2089553344,
 };
 
 enum registers_hash {

@@ -1,8 +1,10 @@
 #include "assembler_fscanf.h"
 #include "enum_djb.h"
 
-//TODO - assert
-//TODO - recalloc
+// TODO - assert
+// TODO - recalloc
+
+// FIXME - SIZEOF в long long
 
 int             main() {
 
@@ -12,7 +14,7 @@ int             main() {
     // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // //
     // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // //
 
-    const char*    to_be_assemblered = "assembler.txt";
+    const char*    to_be_assemblered = "fibonachi.txt";
     const char*    assemblered_file  = "assembler_res.bin";
 
     struct stat    to_be_assemblered_struct;
@@ -138,9 +140,11 @@ potential_error assemble_file_second(char*         buffer_in,         uint8_t** 
     PRINTF("FILE_BUFFER CAPACITY: [%lld]\n", file_buffer_size);
     GETCHAR(); // 
 
-    while (skipped_length < file_buffer_size && (sscanf(buffer_in, "%256[^\n]%n", single_command_line, &debug_index) == 1)) { 
-        // обязательная проверка на то, можем ли мы обращаться к буферу через sscanf (для этого вводим индекс skipped_length)
+    // FIXME - абсолютно пустая строка (то есть нет даже пробелов)
 
+    while (skipped_length < file_buffer_size && 
+          (sscanf(buffer_in, "%256[^\n]%n", single_command_line, &debug_index) == 1)) { 
+        // обязательная проверка на то, можем ли мы обращаться к буферу через sscanf (для этого вводим индекс skipped_length)
         // прочитал строку в массив single_command_line
 
         /*
@@ -150,74 +154,91 @@ potential_error assemble_file_second(char*         buffer_in,         uint8_t** 
             4) если операнды корректные - записал строку и прибавил счётчик команд через побитовую маску
         */
 
-        potential_error check_length_status = validate_string_length(buffer_in, debug_index);
+        PRINTF("СТРОКА КОТОРУЮ МЫ ПОЛУЧИЛИ: <%s>\n", single_command_line);
+        GETCHAR();
 
-        if (check_length_status == OK) {
-            PRINTF("ДЕБАГ ИНДЕКС: <%d>\n", debug_index);
-            GETCHAR();
+        string_type check_if_string_empty_status = check_if_string_empty(single_command_line, debug_index);
 
-            debug_index    += 1; // перешагнули через \n
-            skipped_length += debug_index;
-            buffer_in      += debug_index;
+        debug_index    += 1; // перешагнули через \n
+        skipped_length += debug_index;
+        buffer_in      += debug_index;
 
-            PRINTF("пропущенная длина: [%lld]\n", skipped_length);
-            GETCHAR();
-            
-            if (skipped_length < file_buffer_size) {
-                PRINTF("skipped_length <%lld> VS file_buffer_size <%lld>\n", skipped_length, file_buffer_size);
-                PRINTF("assemble_file_second ||\nbuffer_in ||\nГДЕ Я:\n<%s>, <%c>\n", buffer_in, *buffer_in);
+        if (check_if_string_empty_status != EMPTY) {
+            potential_error check_length_status = validate_string_length(buffer_in, debug_index);
+
+            if (check_length_status == OK) {
+                PRINTF("ДЕБАГ ИНДЕКС: <%d>\n", debug_index);
                 GETCHAR();
+                // NOTE - перенесли вне if'а
+                PRINTF("пропущенная длина: [%lld]\n", skipped_length);
+                GETCHAR();
+                
+                if (skipped_length < file_buffer_size) {
+                    PRINTF("skipped_length <%lld> VS file_buffer_size <%lld>\n", skipped_length, file_buffer_size);
+                    PRINTF("assemble_file_second ||\nbuffer_in ||\nГДЕ Я:\n<%s>, <%c>\n", buffer_in, *buffer_in);
+                    GETCHAR();
+                }
+
+                else {
+                    PRINTF("Из-за арифметики со слэш n мы вышли за пределы буфера\n");
+                    GETCHAR();
+                    long long difference = skipped_length - file_buffer_size + 1; // +1 потому что: допустим
+
+                    /* 
+                        skipped length = 51, что есть размер буфера. 51 - недопустимый для адреса индекс
+                        (максимум 50). тогда skipped_length - file_buffer_size даст 0, а по факту я вылез
+                        за границы своего массива. поэтому прибавляем единичку к разнице, чтобы дифференцс соответствовал
+                        максимально допустимому индексу для адресации. 51 - 51 + 1 = 1. именно столько я должен отнять от buffer_in 
+                    */
+
+                    buffer_in -= difference; // теперь если я и буду работать с buffer_in, это не приведёт к проблемам
+                }
+                // 1 шаг выполнили
+
+                int      command_length = 0;
+                uint32_t command_hash   = pull_the_fucking_command(single_command_line, &command_length);
+                PRINTF("<%d> command_length\n", command_length);
+                // 2 шаг выполнили . вытащили команду
+
+                // индекс сдвинутый на длину команды (ничего более)
+                char* command_line_ptr                   = single_command_line + command_length;
+                PRINTF("assemble_file_second: <%s> single_command_line\n", single_command_line);
+                GETCHAR(); 
+                PRINTF("assemble_file_second: <%s> command_line_ptr\n", command_line_ptr);
+                GETCHAR();
+                potential_error process_command_status   = process_command_byhash(command_hash,          single_command_line, 
+                                                                                    command_line_ptr,      labels_array, 
+                                                                                    &instruction_pointer,  bytecode, 
+                                                                                    bytecode_capacity);
+                    
+                PRINTF("process_command_status: <%d>\n", process_command_status);
+                GETCHAR();
+                if (process_command_status == OK) {
+                    PRINTF("команда успешно обработалась\n");
+                    GETCHAR();
+                }
+
+                else { return process_command_status; }
             }
 
-            else {
-                PRINTF("Из-за арифметики со слэш n мы вышли за пределы буфера\n");
-                GETCHAR();
-                long long difference = skipped_length - file_buffer_size + 1; // +1 потому что: допустим
-
-                /* 
-                    skipped length = 51, что есть размер буфера. 51 - недопустимый для адреса индекс
-                    (максимум 50). тогда skipped_length - file_buffer_size даст 0, а по факту я вылез
-                    за границы своего массива. поэтому прибавляем единичку к разнице, чтобы дифференцс соответствовал
-                    максимально допустимому индексу для адресации. 51 - 51 + 1 = 1. именно столько я должен отнять от buffer_in 
-                */
-
-                buffer_in -= difference; // теперь если я и буду работать с buffer_in, это не приведёт к проблемам
-            }
-            // 1 шаг выполнили
-
-            int      command_length = 0;
-            uint32_t command_hash   = pull_the_fucking_command(single_command_line, &command_length);
-            PRINTF("<%d> command_length\n", command_length);
-            // 2 шаг выполнили . вытащили команду
-
-            // индекс сдвинутый на длину команды (ничего более)
-            char* command_line_ptr                   = single_command_line + command_length;
-            PRINTF("assemble_file_second: <%s> single_command_line\n", single_command_line);
-            GETCHAR(); 
-            PRINTF("assemble_file_second: <%s> command_line_ptr\n", command_line_ptr);
-            GETCHAR();
-            potential_error process_command_status   = process_command_byhash(command_hash,          single_command_line, 
-                                                                              command_line_ptr,      labels_array, 
-                                                                              &instruction_pointer,  bytecode, 
-                                                                              bytecode_capacity);
-             
-            PRINTF("process_command_status: <%d>\n", process_command_status);
-            GETCHAR();
-            if (process_command_status == OK) {
-                PRINTF("команда успешно обработалась\n");
-                GETCHAR();
-            }
-
-            else { return process_command_status; }
+            clear_command_array(single_command_line);
         }
 
-        clear_command_array(single_command_line);
-        
+        else { continue; }
     }
 
     if (progon_index == FIRST) { *commands_and_arguments_counted = instruction_pointer; } // было + 1
 
     return OK;
+}
+
+string_type    check_if_string_empty(char* string_to_check, int string_length) {
+    for (int i = 0; i < string_length; i++) {
+        if (string_to_check[i] != ' ') {
+            return NOT_EMPTY;
+        }
+    }
+    return EMPTY;
 }
 
 potential_error process_command_byhash(uint32_t       command_hash,         char*           single_command_line, 
@@ -244,6 +265,8 @@ potential_error process_command_byhash(uint32_t       command_hash,         char
         MACROS_PROCESS_ZERO_OPERAND_BY_HASH(HLT);
         MACROS_PROCESS_ZERO_OPERAND_BY_HASH(DUP);
         MACROS_PROCESS_ZERO_OPERAND_BY_HASH(CMP);
+        MACROS_PROCESS_ZERO_OPERAND_BY_HASH(OVER);
+        MACROS_PROCESS_ZERO_OPERAND_BY_HASH(SWAP);
 
         MACROS_PROCESS_LABEL_COMMANDS_BY_HASH(JMP);
         MACROS_PROCESS_LABEL_COMMANDS_BY_HASH(JMPA);
@@ -259,7 +282,6 @@ potential_error process_command_byhash(uint32_t       command_hash,         char
 
     return OK;
 }
-
 
 potential_error write_operand(asm_commands_nums     func_asm_code,
                               uint8_t                       flags,
@@ -346,13 +368,11 @@ potential_error parse_operand_push_pop(char*                command_line_ptr,
 
     char reg[MAX_COMMAND_LEN]   = {};
     int  register_flag          = 0;
-    char char_for_pop           = 0;
-    char empty_string[MAX_LINE] = {};
 
-    *debug_index = 0;
+    *debug_index = 0; // NOTE - обнуляем чтобы каждый раз проверять дошёл ли сканф до конца обработки строки
 
-    if (((sscanf(command_line_ptr, " [ %15[^] +] + %lf ]%n", reg, &(ptr_on_operand_struct->number), debug_index) == 2) && debug_index > 0) ||
-        ((sscanf(command_line_ptr, " [ %lf + %15[^] ] ]%n" , &(ptr_on_operand_struct->number), reg, debug_index) == 2) && debug_index > 0) ) 
+    if (((sscanf(command_line_ptr, " [ %15[^] +] + %lf ]%n", reg, &(ptr_on_operand_struct->number), debug_index) == 2) && *debug_index > 0) ||
+        ((sscanf(command_line_ptr, " [ %lf + %15[^] ] ]%n" , &(ptr_on_operand_struct->number), reg, debug_index) == 2) && *debug_index > 0) ) 
     {
         PRINTF("считавшиеся число и регистр: <%lf> и <%s>\n", ptr_on_operand_struct->number, reg);
         GETCHAR();
@@ -360,7 +380,7 @@ potential_error parse_operand_push_pop(char*                command_line_ptr,
         register_flag++;
     } 
 
-    else if ((sscanf(command_line_ptr, " [%lf]%n", &(ptr_on_operand_struct->number), debug_index) == 1) && debug_index > 0) {
+    else if ((sscanf(command_line_ptr, " [%lf]%n", &(ptr_on_operand_struct->number), debug_index) == 1) && *debug_index > 0) {
         PRINTF("считавшееся число: <%lf>\n", ptr_on_operand_struct->number);
         GETCHAR();
         ptr_on_operand_struct->flags = MEMORY_BIT | CONST_BIT;
@@ -373,8 +393,8 @@ potential_error parse_operand_push_pop(char*                command_line_ptr,
         register_flag++;
     } 
 
-    else if (((sscanf(command_line_ptr, "%lf + %15s%n", &(ptr_on_operand_struct->number), reg, debug_index) == 2) && debug_index > 0)|| 
-             ((sscanf(command_line_ptr, "%15s + %lf%n", reg, &(ptr_on_operand_struct->number), debug_index) == 2) && debug_index > 0))
+    else if (((sscanf(command_line_ptr, "%lf + %15s%n", &(ptr_on_operand_struct->number), reg, debug_index) == 2) && *debug_index > 0)|| 
+             ((sscanf(command_line_ptr, "%15s + %lf%n", reg, &(ptr_on_operand_struct->number), debug_index) == 2) && *debug_index > 0))
     {
         if (func_asm_code == PUSH_ASM) {
             PRINTF("считавшееся число и регистр: <%lf> и <%s>\n", ptr_on_operand_struct->number, reg);
@@ -386,7 +406,7 @@ potential_error parse_operand_push_pop(char*                command_line_ptr,
         else { PRINTF("недопустимый операнд (регистр + константа для попа)\n"); return INCORRECT_COMMAND_LINE; }
     } 
 
-    else if ((sscanf(command_line_ptr, "%lf%n", &(ptr_on_operand_struct->number), debug_index) == 1) && debug_index > 0) {
+    else if ((sscanf(command_line_ptr, "%lf%n", &(ptr_on_operand_struct->number), debug_index) == 1) && *debug_index > 0) {
         if (func_asm_code == PUSH_ASM) {
             PRINTF("считавшееся число: <%lf>\n", ptr_on_operand_struct->number);
             GETCHAR();
@@ -396,15 +416,15 @@ potential_error parse_operand_push_pop(char*                command_line_ptr,
         else { PRINTF("недопустимый операнд (константа для попа)\n"); return INCORRECT_COMMAND_LINE; }
     } 
     
-    else if ((sscanf(command_line_ptr, "%15s%n", reg, debug_index) == 1) && debug_index > 0) {
+    else if ((sscanf(command_line_ptr, "%15s%n", reg, debug_index) == 1) && *debug_index > 0) {
         PRINTF("считавшийся регистр (2): %s\n", reg);
         GETCHAR();
         ptr_on_operand_struct->flags = REGISTER_BIT;
         register_flag++;
     } 
 
-    else if (sscanf(command_line_ptr, "%253[ ]", empty_string) == 1) {
-        if (func_asm_code == POP_ASM) { ; }
+    else if (command_line_ptr[0] == '\0') {
+        if (func_asm_code == POP_ASM) { PRINTF("попали сюда (пустой попчик)\n"); GETCHAR(); }
 
         else { PRINTF("недопустимый операнд (пусто для пуша)\n"); return INCORRECT_COMMAND_LINE; }
     }

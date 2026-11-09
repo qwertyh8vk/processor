@@ -26,6 +26,8 @@ const char* const commands[] {
     "HLT",
     "DUP",
     "CMP",
+    "OVER",
+    "SWAP",
 };
 
 const char* const reg_names[] {

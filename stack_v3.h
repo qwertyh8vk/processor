@@ -28,22 +28,22 @@
 #define CANARY_LEFT         1337 // (long long)0xB333DEDDEDAEBALL
 #define CANARY_RIGHT        1488
 
+#define STACK_VALIDATE_BIRDS(...)     stack_validate_birds(__VA_ARGS__)
 #define STACK_VERIFY(...)             stack_verify(__VA_ARGS__)
 #define LOGPRINTF(...)                logprintf(__VA_ARGS__)
-#define PRINTF(...)                   printf(__VA_ARGS__)
 
 #define ON_TOTAL_DEBUG
 
 #ifdef  ON_TOTAL_DEBUG
     #define STACK_DUMP(...)           stack_dump(__VA_ARGS__)
-    #define GETCHAR()                 getchar()
-    #define STACK_VALIDATE_BIRDS(...) stack_validate_birds(__VA_ARGS__)
+    #define STACKPRINTF(...)          printf(__VA_ARGS__)
+    #define STACKGETCHAR()            getchar()
 #endif 
 
 #ifdef  ON_WEAK_DEBUG
-    #define PRINTF(...)               (void(0))
-    #define GETCHAR()                 (void(0))
-    #define STACK_VALIDATE_BIRDS(...) (void(0))
+    #define STACK_DUMP(...)           (void(0))
+    #define STACKPRINTF(...)          (void(0))
+    #define STACKGETCHAR()            (void(0))
 #endif
 
 typedef double STACK_DATA_TYPE;
