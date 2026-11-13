@@ -1,4 +1,4 @@
-#include "assembler_fscanf.h"
+#include "assembler.h"
 #include "enum_djb.h"
 
 // TODO - assert
