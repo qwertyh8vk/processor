@@ -3,7 +3,6 @@
 
 // TODO - assert
 // TODO - recalloc
-
 // FIXME - SIZEOF в long long
 
 int             main() {
@@ -14,8 +13,8 @@ int             main() {
     // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // //
     // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // //
 
-    const char*    to_be_assemblered = "fibonachi.txt";
-    const char*    assemblered_file  = "assembler_res.bin";
+    const char*    to_be_assemblered = "testirovka.txt";
+    const char*    assemblered_file  = "assembler_test_field.bin";
 
     struct stat    to_be_assemblered_struct;
 
@@ -136,40 +135,44 @@ potential_error assemble_file_second(char*         buffer_in,         uint8_t** 
     char       single_command_line[MAX_LINE + 1] = {};
     int        debug_index                       = 0;
     long long  skipped_length                    = 0;
+    int        sscanf_status                     = 2;
 
     PRINTF("FILE_BUFFER CAPACITY: [%lld]\n", file_buffer_size);
-    GETCHAR(); // 
+    GETCHAR();
 
-    // FIXME - абсолютно пустая строка (то есть нет даже пробелов)
-
-    while (skipped_length < file_buffer_size && 
-          (sscanf(buffer_in, "%256[^\n]%n", single_command_line, &debug_index) == 1)) { 
-        // обязательная проверка на то, можем ли мы обращаться к буферу через sscanf (для этого вводим индекс skipped_length)
-        // прочитал строку в массив single_command_line
-
-        /*
-            1) проверил строку на корректность по длине - сделано
-            2) если корректна - вытащил команду - сделано
-            3) если такая команда есть - обработал операнды индивидуально по схеме
-            4) если операнды корректные - записал строку и прибавил счётчик команд через побитовую маску
-        */
-
+    while ((skipped_length < file_buffer_size && (sscanf_status = sscanf(buffer_in, "%256[^\n]%n", single_command_line, &debug_index)) == 1) || 
+                                                 (sscanf_status = sscanf(buffer_in, "%256[^\n]%n", single_command_line, &debug_index)) == 0) 
+        { 
         PRINTF("СТРОКА КОТОРУЮ МЫ ПОЛУЧИЛИ: <%s>\n", single_command_line);
         GETCHAR();
+        
+        if (sscanf_status == 0) {
+            PRINTF("SSCANF_STATUS = 0!!!\n");
+            GETCHAR();
 
-        string_type check_if_string_empty_status = check_if_string_empty(single_command_line, debug_index);
+            debug_index = 0;
+            skipped_length++;
+            buffer_in++;
+
+            continue;
+        }
 
         debug_index    += 1; // перешагнули через \n
         skipped_length += debug_index;
         buffer_in      += debug_index;
 
-        if (check_if_string_empty_status != EMPTY) {
-            potential_error check_length_status = validate_string_length(buffer_in, debug_index);
+        string_type check_if_string_empty_status = check_if_string_empty(single_command_line, debug_index);
 
-            if (check_length_status == OK) {
+        if (check_if_string_empty_status != EMPTY) {
+            potential_error check_length_status                = validate_string_length(buffer_in, debug_index);
+            potential_error remove_comments_from_string_status = remove_comments_from_string(single_command_line, debug_index - 1);
+
+            if (check_length_status == OK && remove_comments_from_string_status == OK) {
                 PRINTF("ДЕБАГ ИНДЕКС: <%d>\n", debug_index);
                 GETCHAR();
+
                 // NOTE - перенесли вне if'а
+
                 PRINTF("пропущенная длина: [%lld]\n", skipped_length);
                 GETCHAR();
                 
@@ -201,15 +204,16 @@ potential_error assemble_file_second(char*         buffer_in,         uint8_t** 
                 // 2 шаг выполнили . вытащили команду
 
                 // индекс сдвинутый на длину команды (ничего более)
-                char* command_line_ptr                   = single_command_line + command_length;
+                char* command_line_ptr = single_command_line + command_length;
                 PRINTF("assemble_file_second: <%s> single_command_line\n", single_command_line);
                 GETCHAR(); 
                 PRINTF("assemble_file_second: <%s> command_line_ptr\n", command_line_ptr);
                 GETCHAR();
+
                 potential_error process_command_status   = process_command_byhash(command_hash,          single_command_line, 
-                                                                                    command_line_ptr,      labels_array, 
-                                                                                    &instruction_pointer,  bytecode, 
-                                                                                    bytecode_capacity);
+                                                                                  command_line_ptr,      labels_array, 
+                                                                                  &instruction_pointer,  bytecode, 
+                                                                                  bytecode_capacity);
                     
                 PRINTF("process_command_status: <%d>\n", process_command_status);
                 GETCHAR();
@@ -221,18 +225,23 @@ potential_error assemble_file_second(char*         buffer_in,         uint8_t** 
                 else { return process_command_status; }
             }
 
+            else {
+                if (check_length_status != OK)                { return check_length_status; }
+                if (remove_comments_from_string_status != OK) { return remove_comments_from_string_status; }
+            }
+
             clear_command_array(single_command_line);
         }
 
         else { continue; }
     }
 
-    if (progon_index == FIRST) { *commands_and_arguments_counted = instruction_pointer; } // было + 1
+    if (progon_index == FIRST) { *commands_and_arguments_counted = (size_t)instruction_pointer; } // было + 1
 
     return OK;
 }
 
-string_type    check_if_string_empty(char* string_to_check, int string_length) {
+string_type     check_if_string_empty(char* string_to_check, int string_length) {
     for (int i = 0; i < string_length; i++) {
         if (string_to_check[i] != ' ') {
             return NOT_EMPTY;
@@ -267,6 +276,7 @@ potential_error process_command_byhash(uint32_t       command_hash,         char
         MACROS_PROCESS_ZERO_OPERAND_BY_HASH(CMP);
         MACROS_PROCESS_ZERO_OPERAND_BY_HASH(OVER);
         MACROS_PROCESS_ZERO_OPERAND_BY_HASH(SWAP);
+        MACROS_PROCESS_ZERO_OPERAND_BY_HASH(DSPL);
 
         MACROS_PROCESS_LABEL_COMMANDS_BY_HASH(JMP);
         MACROS_PROCESS_LABEL_COMMANDS_BY_HASH(JMPA);
@@ -298,7 +308,7 @@ potential_error write_operand(asm_commands_nums     func_asm_code,
 
     func_asm_code_uint = func_asm_code_uint | flags;
 
-    if ((*bytecode_capacity - *instruction_pointer) < sizeof(uint8_t)) {
+    if ((*bytecode_capacity - *instruction_pointer) < (long long)(sizeof(uint8_t))) {
         PRINTF("Появилась необходимость в реаллоке\n");
         GETCHAR();
 
@@ -316,7 +326,7 @@ potential_error write_operand(asm_commands_nums     func_asm_code,
         // uint8_t reg_enum_uint  = (uint8_t)reg; 
         // NOTE - решение проблемы enum : uint8_t
         
-        if ((*bytecode_capacity - *instruction_pointer) < sizeof(uint8_t)) {
+        if ((*bytecode_capacity - *instruction_pointer) < (long long)(sizeof(uint8_t))) {
             PRINTF("Появилась необходимость в реаллоке\n");
             GETCHAR();
 
@@ -332,7 +342,7 @@ potential_error write_operand(asm_commands_nums     func_asm_code,
         PRINTF("Мы попали в CONST бит\n");
         GETCHAR();        
     
-        if ((*bytecode_capacity - *instruction_pointer) < sizeof(STACK_DATA_TYPE)) {
+        if ((*bytecode_capacity - *instruction_pointer) < (long long)(sizeof(STACK_DATA_TYPE))) {
             PRINTF("Появилась необходимость в реаллоке\n");
             GETCHAR();
 
@@ -346,7 +356,7 @@ potential_error write_operand(asm_commands_nums     func_asm_code,
             *instruction_pointer += sizeof(STACK_DATA_TYPE);
         }
 
-        else if(what_we_are_memcpying == LONG_LONG) {
+        else if (what_we_are_memcpying == LONG_LONG) {
 
             memcpy(*bytecode + *instruction_pointer, chislo, sizeof(long long));
             *instruction_pointer += sizeof(long long);
@@ -717,6 +727,39 @@ potential_error validate_string_length(char* buffer_in, int debug_index) {
     else { return OK; }
 }
 
+potential_error remove_comments_from_string(char* string_in, int string_size) {
+    PRINTF("что нам приехало: <%s> & <%c> [string & char]\n", string_in, *string_in);
+    GETCHAR();
+
+    int index = 0;
+
+    while (*string_in != '/' && index < string_size) {
+        string_in++;
+        index++;
+    }
+
+    if (*string_in == '/') {
+        PRINTF("Попали (не верю уже себе: 04:16) на первый слеш!\n");
+        PRINTF("%c\n", *string_in);
+
+        if (*(string_in + 1) == '/') {
+            PRINTF("мы попали в комментарий, потому что я встретил два слеша подряд\n");
+            GETCHAR();
+            PRINTF("<%d>\n", index);
+
+            while (index < string_size) {
+                PRINTF("хочу вот на пробельчик поменять\n");
+
+                *string_in = ' ';
+                string_in++;
+                index++;
+            }
+        }
+    }
+
+    return OK;
+}
+
 potential_error recalloc(uint8_t** bytecode, long long* bytecode_capacity) {
     assert(bytecode && bytecode_capacity);
 
@@ -740,14 +783,14 @@ potential_error recalloc(uint8_t** bytecode, long long* bytecode_capacity) {
         }
 }
 
-potential_error write_bytecode_in_binary(const char* exit_filename, uint8_t* bytecode, long long valuable_bytes) {
+potential_error write_bytecode_in_binary(const char* exit_filename, uint8_t* bytecode, size_t valuable_bytes) {
     assert(exit_filename && bytecode);
 
     FILE* file_pointer = fopen(exit_filename, "wb");
 
     if (file_pointer != NULL) {
         PRINTF("Файл открылся успешно (write_bytecode_in_binary)\n");
-        PRINTF("Число значимых uint8_t байтов: <%lld>\n", valuable_bytes);
+        PRINTF("Число значимых uint8_t байтов: <%zu>\n", valuable_bytes);
         GETCHAR();
 
         fwrite(bytecode, sizeof(uint8_t), valuable_bytes, file_pointer);

@@ -29,6 +29,7 @@ enum asm_commands_nums : uint8_t {
 	CMP_ASM  = 21,
 	OVER_ASM = 22,
 	SWAP_ASM = 23,
+	DSPL_ASM = 24,
 };
 
 enum commands_hash {
@@ -55,6 +56,7 @@ enum commands_hash {
 	CMP  = 193452581,
 	OVER = 2089408641,
 	SWAP = 2089553344,
+	DSPL = 2089010424,
 };
 
 enum registers_hash {

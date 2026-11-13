@@ -15,38 +15,38 @@
 
 #define MACROS_PROCESS_PUSH_POP_BY_HASH(cmd)                                       \
     case cmd:                                                                      \
-    {                                                                              \ 
+    {                                                                              \
         potential_error pe = validate_push_pop_command(command_line_ptr,           \
                                                        cmd ## _ASM,                \
                                                        bytecode,                   \
                                                        instruction_pointer,        \
-                                                       bytecode_capacity);         \ 
-        if (pe != OK) { return pe; }                                               \               
+                                                       bytecode_capacity);         \
+        if (pe != OK) { return pe; }                                               \
         break;                                                                     \
     } 
 
 #define MACROS_PROCESS_ZERO_OPERAND_BY_HASH(cmd)                                   \
     case cmd:                                                                      \
-    {                                                                              \ 
+    {                                                                              \
         potential_error pe = validate_zero_operands_commands(command_line_ptr,     \
                                                              cmd ## _ASM,          \
                                                              bytecode,             \
                                                              instruction_pointer,  \
-                                                             bytecode_capacity);   \ 
-        if (pe != OK) { return pe; }                                               \               
+                                                             bytecode_capacity);   \
+        if (pe != OK) { return pe; }                                               \
         break;                                                                     \
     } 
 
 #define MACROS_PROCESS_LABEL_COMMANDS_BY_HASH(cmd)                                \
     case cmd:                                                                     \
-    {                                                                             \ 
+    {                                                                             \
         potential_error pe = validate_commands_only_labels(command_line_ptr,      \
                                                            labels_array,          \
                                                            cmd ## _ASM,           \
                                                            bytecode,              \
                                                            instruction_pointer,   \
                                                            bytecode_capacity);    \
-        if (pe != OK) { return pe; }                                              \               
+        if (pe != OK) { return pe; }                                              \
         break;                                                                    \
     } 
 
@@ -64,20 +64,10 @@
 #define REGISTER_BIT 0b01000000
 #define CONST_BIT    0b00100000
 
-#define MAX_LABELS_AMOUNT 128
-#define MAX_LINE          256
+#define MAX_LABELS_AMOUNT   128
+#define MAX_LINE            256
 
-// #define ON_DEBUG
-
-#ifdef  ON_DEBUG
-    #define PRINTF(...) printf(__VA_ARGS__)
-    #define GETCHAR()   getchar()
-#endif
-
-#ifndef ON_DEBUG
-    #define PRINTF(...) (void(0))
-    #define GETCHAR()   (void(0))
-#endif
+#include "conditional_printf.h"
 
 typedef double STACK_DATA_TYPE;
 
@@ -87,13 +77,13 @@ enum datatype {
 };
 
 enum progon_index {
-    FIRST  = 1,
-    SECOND = 2,
+    FIRST       = 1,
+    SECOND      = 2,
 };
 
 enum string_type {
-    EMPTY     = 1,
-    NOT_EMPTY = 2,
+    EMPTY       = 1,
+    NOT_EMPTY   = 2,
 };
 
 enum potential_error  {
@@ -120,12 +110,12 @@ enum potential_error  {
 #include "generated_enums.h"
 
 typedef struct {
+
     uint8_t                  flags;
     register_nums              reg;
     STACK_DATA_TYPE         number;
-
-    //FIXME - Оч важная хуйня!!!!!
     long long                label;
+
 } operand_data;
 
 potential_error obrabotka_faila(char*      file_buffer,       uint8_t** bytecode, const char* exit_filename,
@@ -191,7 +181,9 @@ potential_error recalloc(uint8_t** bytecode, long long* bytecode_capacity);
 
 potential_error validate_string_length(char* buffer_in, int debug_index);
 
-potential_error write_bytecode_in_binary(const char* exit_filename, uint8_t* bytecode, long long valuable_bytes);
+potential_error remove_comments_from_string(char* string_in, int string_size);
+
+potential_error write_bytecode_in_binary(const char* exit_filename, uint8_t* bytecode, size_t valuable_bytes);
 
 uint32_t        pull_the_fucking_command(const char* single_command_line, int* command_length);
 

@@ -1,0 +1,249 @@
+Assembler_fscanf:
+1: проверка на дибила- есть ли какие то аргументы идущие сверх нужного (допустим 3 числа у pop, 2 числа у div) - сразу CPU_ERR;
+2: макросы чтобы решить вопрос с большим свичом в Assembler_fscanf
+3: повторяющийся код в отладке processor.cpp загнать в функцию отладки.
+4: сделать видеопамять и отрендерить кружок
+5: побитовые операции но это пока рано
+
+функция write_command понадобится стоооо процентов
+структура команды сто процентов
+
+самый хард
+PUSH_ASM = 1,
+POP_ASM  = 2,
+
+абсолютня халява, если есть что-то ещё на строке - HLT
+ADD_ASM  = 3,
+SUB_ASM  = 4,
+MUL_ASM  = 5,
+DIV_ASM  = 6,
+SQRT_ASM = 7,
+MOD_ASM  = 8,
++
+RET_ASM  = 16,
+IN_ASM   = 17,
+OUT_ASM  = 18,
+HLT_ASM  = 19,
+DUP_ASM  = 20,
+CMP_ASM  = 21,
+
+халява, если есть что-то кроме одной метки - HLT
+JMP_ASM  = 9,
+JMPA_ASM = 10,
+JMPB_ASM = 11,
+JAE_ASM  = 12,
+JBE_ASM  = 13,
+JMPE_ASM = 14,
+CALL_ASM = 15,
+
+______________________________________________
+
+PUSH 5
+POP AX
+PUSH 11
+POP [2+AX]
+PUSH [7]
+OUT
+PUSH [2+AX]
+OUT
+PUSH 22
+POP [AX]
+PUSH [5]
+OUT
+PUSH [AX]
+OUT
+HLT
+______________________________________________
+IN
+POP AX
+PUSH 1
+PUSH 1
+PUSH 2
+PUSH AX
+SUB
+POP AX
+:1
+OVER
+ADD 
+SWAP
+PUSH 0
+PUSH 1
+PUSH AX
+SUB
+CMP
+POP AX
+POP
+JMPA :1
+SWAP
+OUT 
+HLT
+______________________________________________
+
+:2 = ZXCrecurse!!!!!!!!
+:1, :3 = fibych!!!!!!!
+
+IN
+
+CALL :1
+OUT
+HLT
+
+:1
+
+PUSH 1
+OVER
+CMP
+POP
+POP
+JMPA :2
+RET
+
+:2
+
+DUP
+POP AX
+PUSH 0
+PUSH [AX]
+CMP
+POP
+POP
+JMPA :3
+PUSH 1
+OVER
+SUB
+CALL :1
+OVER
+PUSH 2
+SWAP
+SUB
+CALL :1
+ADD
+SWAP
+POP AX
+DUP
+POP [AX]
+RET
+:3
+POP
+PUSH [AX]
+RET
+______________________________________________
+
+!!!!!
+:1 == a = 0
+:2 == a & b = 0
+:3 == a & b & c = 0
+
+:4 == discriminant > 0
+:5 == discriminant = 0
+!!!!!
+
+IN
+POP [0]
+IN
+POP [1]
+IN
+POP [2]
+
+PUSH 0
+PUSH [0]
+CMP
+POP
+POP
+
+JMPE :1
+
+PUSH [0]
+PUSH [2]
+MUL
+PUSH 4
+MUL
+PUSH [1]
+PUSH [1]
+MUL
+SUB
+POP [3]
+PUSH 0
+PUSH [3]
+CMP
+POP
+POP
+JMPA :4
+JMPE :5
+PUSH 0
+OUT
+HLT
+
+:5
+PUSH 1
+OUT
+PUSH [0]
+PUSH 2
+MUL
+PUSH [1]
+PUSH 0
+SUB
+DIV
+OUT
+HLT
+
+:4
+PUSH 2
+OUT
+PUSH [3]
+SQRT
+POP [4]
+PUSH [0]
+PUSH 2
+MUL
+PUSH [1]
+PUSH 0
+SUB
+PUSH [4]
+ADD
+DIV
+OUT
+PUSH [0]
+PUSH 2
+MUL
+PUSH [4]
+PUSH [1]
+PUSH 0
+SUB
+SUB
+DIV
+OUT
+HLT
+
+:1
+PUSH 0
+PUSH [1]
+CMP
+POP
+POP
+JMPE :2
+PUSH 1
+OUT
+PUSH [1]
+PUSH [2]
+PUSH 0
+SUB
+DIV
+OUT
+HLT
+
+:2
+PUSH 0
+PUSH [2]
+CMP
+POP
+POP
+JMPE :3
+PUSH 0
+OUT
+HLT
+
+:3
+PUSH -1
+OUT
+HLT

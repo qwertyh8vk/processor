@@ -1,160 +1,11 @@
-#include <assert.h>
-#include <ctype.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <stdint.h>
-#include <unistd.h>
-#include <math.h>
-
-#include "stack_v3.h"
-#include "generated_enums.h"
-
-#define REGS_AMOUNT            4
-#define BASIC_LENGTH           2 
-#define FUNCS_AMOUNT          23
-#define MAX_AMT_OF_DGTS      150
-
-#define MEMORY_BIT      0b10000000
-#define REGISTER_BIT    0b01000000
-#define CONST_BIT       0b00100000
-
-#define OPCODE_MASKA    0b00011111
-#define MODE_MASKA      0b11100000
-
-#define ONLY_RAM        0b10000000
-#define REG_CONST       0b01100000
-#define CONST           0b00100000
-#define NOTHING         0b00000000
-
-#define PROCPRINTF(...)  printf(__VA_ARGS__)
-#define PROCGETCHAR(...) getchar(__VA_ARGS__)
-
-#define JMP_MACROS_INITIALIZE(func_name, mode_1, mode_2)   \
-    cpu_status func_name##_asm(cpu_struct* cpu) { \                  
-        return jmp_cond_universal(cpu, mode_1, mode_2);    \
-    }                                                                         
-
-enum cmp_compare_res {
-    BELOW = -1,
-    EQUAL =  0,
-    ABOVE =  1,
-};
-
-enum stack_consts {
-    CALL_STACK = 1,
-    CALC_STACK = 2,
-};
-
-enum cpu_status {
-    CPU_FINE               =  0,
-
-    CPU_HLT                =  4,
-
-    CPU_ERR                = -1,
-    CPU_UNK_CMD            = -2,
-    CPU_UNCHECKED_CASE     = -3,
-    NUMBER_IS_NOT_WHORE    = -4,
-    INVALID_VIDEORAM_INDEX = -5,
-    BAD_COMMAND_MODE       = -6,
-};
-
-const   int           RAM_MB = 8192;
-
-typedef struct        cpu_struct cpu_struct;
-typedef               cpu_status (*cmd_handler)(cpu_struct* cpu);
-
-cpu_struct*           initialize_cpu_struct(const char* filename, size_t bytes_read_from_bin);
-size_t                get_bytes_in_bin_amount(const char* filename);
-stack_potential_error cpu_stack_dump(cpu_struct* cpu, stack_consts stack_mode);
-void                  cpu_code_array_dump(cpu_struct* cpu, size_t size_of_array);
-cpu_status            validate_videoram_index(STACK_DATA_TYPE number);
-cpu_status            check_whole_number(STACK_DATA_TYPE number);
-
-cpu_status            jmp_cond_universal(cpu_struct* cpu, 
-                                         cmp_compare_res mode_1, 
-                                         cmp_compare_res mode_2);
-
-cpu_status            finish_instruction(cpu_struct*           cpu, 
-                                         stack_potential_error stack_opname_status, 
-                                         long long             bytes_amount);
-
-cpu_status            push_asm(cpu_struct*  cpu);
-cpu_status            pushr_asm(cpu_struct* cpu);
-cpu_status            pop_asm(cpu_struct*   cpu); 
-cpu_status            popr_asm(cpu_struct*  cpu); 
-
-cpu_status            add_asm(cpu_struct*   cpu); 
-cpu_status            sub_asm(cpu_struct*   cpu); 
-cpu_status            mul_asm(cpu_struct*   cpu); 
-cpu_status            div_asm(cpu_struct*   cpu); 
-cpu_status            sqrt_asm(cpu_struct*  cpu); 
-cpu_status            mod_asm(cpu_struct*   cpu); 
-
-cpu_status            jmp_asm(cpu_struct*   cpu); 
-cpu_status            jmpa_asm(cpu_struct*  cpu); 
-cpu_status            jmpb_asm(cpu_struct*  cpu); 
-cpu_status            jae_asm(cpu_struct*   cpu); 
-cpu_status            jbe_asm(cpu_struct*   cpu); 
-cpu_status            jmpe_asm(cpu_struct*  cpu); 
-
-cpu_status            call_asm(cpu_struct*  cpu); 
-cpu_status            ret_asm(cpu_struct*   cpu); 
-
-cpu_status            in_asm(cpu_struct*    cpu); 
-cpu_status            out_asm(cpu_struct*   cpu); 
-
-cpu_status            hlt_asm(cpu_struct*   cpu); 
-
-cpu_status            dup_asm(cpu_struct*   cpu);
-cpu_status            cmp_asm(cpu_struct*   cpu);
-cpu_status            over_asm(cpu_struct*  cpu);
-cpu_status            swap_asm(cpu_struct*  cpu);
-
-cpu_status            cpu_work_cycle(cpu_struct* cpu);
-
-
-cmd_handler asm_funcs[FUNCS_AMOUNT] {
-    /* первый логический блок */
-    push_asm,
-    pop_asm,
-
-    /* второй логический блок */
-    add_asm,
-    sub_asm,
-    mul_asm,
-    div_asm,
-    sqrt_asm,
-    mod_asm,
-
-    /* третий логический блок */
-    jmp_asm,
-    jmpa_asm,
-    jmpb_asm,
-    jae_asm,
-    jbe_asm,
-    jmpe_asm,
-
-    /* четвертый логический блок */
-    call_asm,
-    ret_asm,
-
-    /* пятый логический блок */
-    in_asm,
-    out_asm,
-    
-    /* шестой логический блок */
-    hlt_asm,
-
-    /* всё что не вошло в предыдущие блоки*/
-    dup_asm,
-    cmp_asm,
-    over_asm,
-    swap_asm,
-};
+#include "processor.h"
 
 int main() {
-    const char* assembler_to_cpu = "assembler_res.bin";
+    const char* assembler_to_cpu = "assembler_test_field.bin";
+    const char* circle_assembler = "circle_assembler.txt";
+
+    // create_asm_for_circle(circle_assembler, 25);
+
     size_t bytes_in_bin_file_amount = get_bytes_in_bin_amount(assembler_to_cpu);
 
     PROCPRINTF("Что насчитала моя функция get_bytes_in_bin_amount: [%zu]\n", bytes_in_bin_file_amount);
@@ -181,7 +32,7 @@ struct cpu_struct {
     defended_stack*   calculations_stack;
     defended_stack*   call_stack;
 
-    STACK_DATA_TYPE   regs[REGS_AMOUNT];
+    STACK_DATA_TYPE   regs[N_REGS];
     cpu_status        processor_status;
 
     cmp_compare_res   cmp_flag;
@@ -195,7 +46,7 @@ struct cpu_struct {
 
 // TODO  - видеопамять
 // TODO  - Фибоначи
-// TODO  - Отсортировать функции
+// TODO  - квадратка
 
 // FIXME - [-Wsign-compare] !!!!!!!!!!!!!!!!!
 
@@ -384,6 +235,8 @@ cpu_status  sub_asm(cpu_struct* cpu) {
     else { return CPU_ERR; }
 }
 
+// MACROS_FOR_SUB_MUL_DIV(cpu, +)
+
 cpu_status  mul_asm(cpu_struct* cpu) {
     PROCPRINTF("Текущий байт байткода: [%lld]\n", cpu->instruction_pointer);
 
@@ -482,7 +335,7 @@ cpu_status  jmp_asm(cpu_struct* cpu) {
 
     const size_t code_obsolet_size = cpu->code_obsolet_size;
 
-    if (where_we_want_to_jump >= 0 && where_we_want_to_jump < code_obsolet_size) { cpu->instruction_pointer = where_we_want_to_jump; }
+    if (where_we_want_to_jump >= 0 && where_we_want_to_jump < (long long)code_obsolet_size) { cpu->instruction_pointer = where_we_want_to_jump; }
     
     else {
         PROCPRINTF("Нубля сюда прыгать я ещё не научился\n");
@@ -529,7 +382,7 @@ cpu_status  jmp_cond_universal(cpu_struct* cpu,
     int cpu_current_flag = cpu->cmp_flag;
 
     if (cpu_current_flag == mode_1 || cpu_current_flag == mode_2) {
-        if (where_we_want_to_jump >= 0 && where_we_want_to_jump < code_obsolet_size) { 
+        if (where_we_want_to_jump >= 0 && where_we_want_to_jump < (long long)code_obsolet_size) { 
             cpu->instruction_pointer = where_we_want_to_jump; 
             PROCPRINTF("Установил точку откуда будем выполнять команды\n");
             cpu_code_array_dump(cpu, code_obsolet_size);
@@ -579,7 +432,7 @@ cpu_status  call_asm(cpu_struct* cpu) {
 
     stack_potential_error stack_push_wwwtsf_status = BAD_DEFAULT;
 
-    if (where_we_want_to_start_from_again < code_obsolet_size) {
+    if (where_we_want_to_start_from_again >= 0 && where_we_want_to_start_from_again < (long long)code_obsolet_size) {
         stack_push_wwwtsf_status = stack_push(ptr_on_cpu_call_stack, (STACK_DATA_TYPE)where_we_want_to_start_from_again); // NOTE - приходится приводить к double, поскольку 
         stack_dump(ptr_on_cpu_call_stack);
     }
@@ -592,7 +445,7 @@ cpu_status  call_asm(cpu_struct* cpu) {
     }
     
     if (stack_push_wwwtsf_status == OK) {
-        if (where_we_want_to_jump >= 0 && where_we_want_to_jump < code_obsolet_size) { 
+        if (where_we_want_to_jump >= 0 && where_we_want_to_jump < (long long)code_obsolet_size) { 
             cpu_code_array_dump(cpu, code_obsolet_size);
 
             cpu->instruction_pointer = where_we_want_to_jump; 
@@ -644,7 +497,7 @@ cpu_status  ret_asm(cpu_struct* cpu) {
 
 cpu_status  in_asm(cpu_struct* cpu) {
     PROCPRINTF("Текущий байт байткода: [%lld]\n", cpu->instruction_pointer);
-    PROCPRINTF("НУ что, товарищ пользователь, введите число которое я запушу в calc_stack: ");
+    printf("НУ что, товарищ пользователь, введите число которое я запушу в calc_stack: ");
     char  read_string_typed_by_user[MAX_AMT_OF_DGTS] = {};
     char* fgets_result = fgets(read_string_typed_by_user, MAX_AMT_OF_DGTS, stdin);
 
@@ -698,7 +551,7 @@ cpu_status  out_asm(cpu_struct* cpu) {
         stack_potential_error stack_pop_status = stack_pop(ptr_on_cpu_calc_stack, &value_to_out);
         if (stack_pop_status == OK) {
             
-            fprintf(stdout, GREEN "ЛАСТ ЧИСЛО ИЗ СТЭКА: " RESET PURPLE "[%lf]\n" RESET, value_to_out);
+            printf(GREEN "ЛАСТ ЧИСЛО ИЗ СТЭКА: " RESET PURPLE "[%lf]\n" RESET, value_to_out);
 
             // cpu->instruction_pointer += sizeof(uint8_t);
             // NOTE - здесь не нужен шаг +1 поскольку мы его сделали внутри dup_asm
@@ -851,6 +704,35 @@ cpu_status  swap_asm(cpu_struct* cpu) {
     else { return CPU_ERR; }
 }
 
+cpu_status  dspl_asm(cpu_struct* cpu) {
+    PROCPRINTF("Текущий байт байткода: [%lld]\n", cpu->instruction_pointer);
+
+    for (int i = 0; i < RAM_MB; i++) {
+        if ((i % ARR_HEIGHT) == ARR_HEIGHT - 1) {
+            if (fabs((cpu->videoram)[i] - 1) < EPSILON) {
+                printf("##\n");
+            }
+
+            else {
+                printf("  \n");
+            }
+        }
+        
+        else {
+            if (fabs((cpu->videoram)[i] - 1) < EPSILON) {
+                printf("##");
+            }
+
+            else {
+                printf("  ");
+            }
+        }
+    }
+
+    cpu->instruction_pointer += sizeof(uint8_t);
+    
+    return CPU_FINE;
+}
 // FIXME - много копипасты у следующих функций:
 // FIXME - add, sub, mul, div
 // FIXME - push, over, swap
@@ -879,7 +761,7 @@ cpu_struct* initialize_cpu_struct(const char* filename, size_t bytes_read_from_b
         ryzen7_5700->code = (uint8_t *)calloc(bytes_read_from_bin, sizeof(uint8_t)); // первая переделка - массив кода теперь имеет тип uint8_t
         // NOTE - Первый шаг положен, двигаемся дальше
 
-        size_t bytes_written_in_buffer = read(file_descr, ryzen7_5700->code, bytes_read_from_bin);
+        ssize_t bytes_written_in_buffer = read(file_descr, ryzen7_5700->code, bytes_read_from_bin);
 
         if (bytes_written_in_buffer == bytes_read_from_bin) {
             ryzen7_5700->instruction_pointer = 0; // по умолчанию указываем на первый байт в массиве code
@@ -889,7 +771,7 @@ cpu_struct* initialize_cpu_struct(const char* filename, size_t bytes_read_from_b
             ryzen7_5700->processor_status    = CPU_FINE;
             ryzen7_5700->cmp_flag            = EQUAL; // 0 по дефолту, что достаточно логично
             
-            for (int i = 0; i < REGS_AMOUNT; i++) {
+            for (int i = 0; i < N_REGS; i++) {
                 (ryzen7_5700->regs)[i] = 0; // значения всех регистров по умолчанию выставляем в ноль.
             }
 
@@ -938,11 +820,10 @@ size_t      get_bytes_in_bin_amount(const char* filename) {
 }
 
 cpu_status  cpu_work_cycle(cpu_struct* cpu) {
-    long long   instruction_pointer  = cpu->instruction_pointer;
-    const size_t code_obsolet_size    = cpu->code_obsolet_size;
+    const size_t code_obsolet_size = cpu->code_obsolet_size;
 
     /* условия выхода: адекватное - мы дошли до HLT, или мы дошли до конца кода, но при этом HLT не встретили - в таком случае мы шлём пользователя нахуй и дропаем программу!*/
-    while(instruction_pointer < code_obsolet_size) {
+    while(cpu->instruction_pointer >= 0 && cpu->instruction_pointer < (long long)code_obsolet_size) {
         /* пока работаем - исполняй команды. обрабатывай статус после каждой команды */
         
         uint8_t what_we_are_executing = (cpu->code)[cpu->instruction_pointer];
@@ -959,7 +840,7 @@ cpu_status  cpu_work_cycle(cpu_struct* cpu) {
 
         uint8_t opcode_index_in_array = our_current_opcode - 1; // минимальный our_current_opcode равен единице, поэтому index_in_array при нормальной работе должен быть равен 0
 
-        if (opcode_index_in_array >= 0 && opcode_index_in_array <= FUNCS_AMOUNT) {
+        if (opcode_index_in_array >= 0 && opcode_index_in_array <= N_CMDS) {
             PROCPRINTF("Всё нормально! " ORANGE "(cpu_work_cycle)\n" RESET);
             PROCGETCHAR();
 
@@ -977,6 +858,13 @@ cpu_status  cpu_work_cycle(cpu_struct* cpu) {
 
                 cpu->processor_status = CPU_ERR;
                 return CPU_ERR;
+            }
+
+            else if (cpu->instruction_pointer >= (long long)code_obsolet_size) {
+                PROCPRINTF(ORANGE "Мы НЕ дошли до хальт. Ниче стращного щас просто ебнем програмку ВМЕСТЕ С ОПЕРАЦИОНКОЙ и всё.\n" RESET);
+
+                cpu->processor_status = CPU_DESTROY_USER_SYSTEM; // в структурку всё таки это надо записать
+                return CPU_DESTROY_USER_SYSTEM;
             }
 
             cpu_stack_dump(cpu, CALC_STACK);
@@ -1011,7 +899,7 @@ cpu_status  check_whole_number(STACK_DATA_TYPE number) {
 }
 
 cpu_status  validate_videoram_index(STACK_DATA_TYPE number) {
-    if (fabs(number - 0) < EPSILON && fabs(number - RAM_MB) < EPSILON) {
+    if (number >= 0 && number <= RAM_MB) {
         PROCPRINTF("индекс допустимый\n");
         PROCGETCHAR();
 
@@ -1062,6 +950,34 @@ void        cpu_code_array_dump(cpu_struct* cpu, size_t size_of_array) {
 
     PROCPRINTF("\n");
     PROCPRINTF(DARK_PURPLE "========================================================================================================================\n" RESET);
+}
+
+void        create_asm_for_circle(const char* filename, int circle_radius) {
+    FILE* file_pointer = fopen(filename, "w");
+
+    if (file_pointer != NULL) {
+        int x0             = (ARR_WIDTH  - 1) / 2;   // 27
+        int y0             = (ARR_HEIGHT - 1) / 2;   // 27
+        int squared_radius = circle_radius * circle_radius;
+
+        for (int y = 0; y < ARR_HEIGHT; y++) {
+            for (int x = 0; x < ARR_WIDTH; x++) {
+                int dx = x - x0;
+                int dy = y - y0;
+
+                int element_coords = x + y * ARR_WIDTH;
+
+                if (dx * dx + dy * dy <= squared_radius) { 
+                    fprintf(file_pointer, "PUSH 1\nPOP [%d]\n", element_coords);
+                }
+            }
+        }
+        
+        fprintf(file_pointer, "DSPL\n");
+        fclose(file_pointer);
+    }
+    
+    else { PROCPRINTF("create_asm_for_circle: Файл не удалось открыть\n"); PROCGETCHAR(); }
 }
 
 stack_potential_error cpu_stack_dump(cpu_struct* cpu, stack_consts stack_mode) {

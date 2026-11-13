@@ -25,14 +25,14 @@
 
 #define STACK_INIT_CAPACITY    4
 #define INCREASE_COEFF         2
-#define CANARY_LEFT         1337 // (long long)0xB333DEDDEDAEBALL
+#define CANARY_LEFT         1337
 #define CANARY_RIGHT        1488
 
 #define STACK_VALIDATE_BIRDS(...)     stack_validate_birds(__VA_ARGS__)
 #define STACK_VERIFY(...)             stack_verify(__VA_ARGS__)
 #define LOGPRINTF(...)                logprintf(__VA_ARGS__)
 
-#define ON_TOTAL_DEBUG
+#define ON_WEAK_DEBUG
 
 #ifdef  ON_TOTAL_DEBUG
     #define STACK_DUMP(...)           stack_dump(__VA_ARGS__)
@@ -66,7 +66,7 @@ enum stack_function_called_from {
 enum stack_potential_error {
     OK = 0,
 
-    STACK_UNAVAILABLE_CAPACITY_VALUE      = 1, // генераторные макросы керниган ритчи 
+    STACK_UNAVAILABLE_CAPACITY_VALUE      = 1,  
     STACK_NULL_POINTER_ERROR              = 2,
     STACK_ALREADY_INITIALIZED_ERROR       = 3,
     STACK_VIOLATED_RIGHT_CANARY           = 4,
