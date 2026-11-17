@@ -17,6 +17,8 @@
     case cmd:                                                                      \
     {                                                                              \
         potential_error pe = validate_push_pop_command(command_line_ptr,           \
+                                                       single_command_line,        \
+                                                       command_length,             \
                                                        cmd ## _ASM,                \
                                                        bytecode,                   \
                                                        instruction_pointer,        \
@@ -29,6 +31,8 @@
     case cmd:                                                                      \
     {                                                                              \
         potential_error pe = validate_zero_operands_commands(command_line_ptr,     \
+                                                             single_command_line,  \
+                                                             command_length,       \
                                                              cmd ## _ASM,          \
                                                              bytecode,             \
                                                              instruction_pointer,  \
@@ -41,6 +45,8 @@
     case cmd:                                                                     \
     {                                                                             \
         potential_error pe = validate_commands_only_labels(command_line_ptr,      \
+                                                           single_command_line,   \
+                                                           command_length,        \
                                                            labels_array,          \
                                                            cmd ## _ASM,           \
                                                            bytecode,              \
@@ -66,6 +72,7 @@
 
 #define MAX_LABELS_AMOUNT   128
 #define MAX_LINE            256
+#define REG_LENGTH            2
 
 #include "conditional_printf.h"
 
@@ -105,8 +112,11 @@ enum potential_error  {
     INCORRECT_REG          = 14,
     BYTECODE_OVERFLOW      = 15,
     REALLOC_FAILED         = 16,
+    HASH_COLLISION         = 17,
+    HASH_PROBLEMS          = 18,
 }; 
 
+#include "cmds_and_regs_manual.h"
 #include "generated_enums.h"
 
 typedef struct {
@@ -132,7 +142,7 @@ potential_error assemble_file_second(char*         buffer_in,         uint8_t** 
 potential_error process_command_byhash(uint32_t       command_hash,         char*           single_command_line, 
                                         char*         command_line_ptr,     long long*      labels_array,
                                         long long*    instruction_pointer,  uint8_t**       bytecode, 
-                                        long long*    bytecode_capacity);
+                                        long long*    bytecode_capacity,    int             command_length);
 
 potential_error write_operand(asm_commands_nums     func_asm_code,
                               uint8_t                       flags,
@@ -149,6 +159,8 @@ potential_error parse_operand_push_pop(char*               command_line_ptr,
                                        asm_commands_nums      func_asm_code);   
 
 potential_error validate_push_pop_command(char*              command_line_ptr, 
+                                          char*              single_command_line,
+                                          int                command_length,
                                           asm_commands_nums  func_asm_code, 
                                           uint8_t**          bytecode,
                                           long long*         instruction_pointer,
@@ -156,7 +168,12 @@ potential_error validate_push_pop_command(char*              command_line_ptr,
 
 register_nums   determine_register(char* reg);
 
-potential_error validate_zero_operands_commands(char*              command_line_ptr, 
+potential_error determine_string_for_anti_collision(asm_commands_nums func_asm_code, char* array_to_fill);
+potential_error determine_register_for_anti_collision(register_nums reg_asm_code, char* array_to_fill);
+
+potential_error validate_zero_operands_commands(char*              command_line_ptr,
+                                                char*              single_command_line, 
+                                                int                command_length,
                                                 asm_commands_nums  func_asm_code, 
                                                 uint8_t**          bytecode,
                                                 long long*         instruction_pointer,
@@ -166,7 +183,9 @@ potential_error check_string_after_arg(char* command_line_ptr);
 
 string_type     check_if_string_empty(char* string_to_check, int string_length);
 
-potential_error validate_commands_only_labels(char*              command_line_ptr, 
+potential_error validate_commands_only_labels(char*              command_line_ptr,
+                                              char*              single_command_line,
+                                              int                command_length,
                                               long long*         labels_array, 
                                               asm_commands_nums  func_asm_code,
                                               uint8_t**          bytecode,

@@ -1,10 +1,21 @@
 #include "processor.h"
 
+/*
+0 0  0 -1
+0 0  1 0
+1 0 -4 (2 -2 +2)
+1 0  4  0
+1 0  0  (1 0 || 2 0 0)
+0 5  10 (1 -2)
+*/
+
 int main() {
-    const char* assembler_to_cpu = "assembler_test_field.bin";
+    const char* assembler_to_cpu = "assembler_res.bin";
+
+    //NOTE - тут создание асм файла для кружка
     const char* circle_assembler = "circle_assembler.txt";
 
-    // create_asm_for_circle(circle_assembler, 25);
+    // create_asm_for_circle(circle_assembler, 15);
 
     size_t bytes_in_bin_file_amount = get_bytes_in_bin_amount(assembler_to_cpu);
 
@@ -967,13 +978,14 @@ void        create_asm_for_circle(const char* filename, int circle_radius) {
 
                 int element_coords = x + y * ARR_WIDTH;
 
-                if (dx * dx + dy * dy <= squared_radius) { 
+                if ((dx * dx) / 2 + (dy * dy) / 7 <= squared_radius) { 
                     fprintf(file_pointer, "PUSH 1\nPOP [%d]\n", element_coords);
                 }
             }
         }
         
         fprintf(file_pointer, "DSPL\n");
+        fprintf(file_pointer, "HLT\n");
         fclose(file_pointer);
     }
     

@@ -79,7 +79,7 @@ OUT
 HLT
 ______________________________________________
 
-:2 = ZXCrecurse!!!!!!!!
+:2     = ZXCrecurse!!!!!!!!
 :1, :3 = fibych!!!!!!!
 
 IN
@@ -247,3 +247,41 @@ HLT
 PUSH -1
 OUT
 HLT
+
+
+    switch (func_asm_code) 
+
+        case PUSH_ASM:  
+            memcpy(array_to_fill, "PUSH", 4);
+
+        case POP_ASM:
+            memcpy(array_to_fill, "POP",  3);
+
+        case ADD_ASM:
+            memcpy(array_to_fill, "ADD",  3);
+
+        case SUB_ASM:
+            memcpy(array_to_fill, "ADD",  3);
+
+        case MUL_ASM:
+        case DIV_ASM:
+        case SQRT_ASM:
+        case MOD_ASM:
+        case JMP_ASM:
+        case JMPA_ASM:
+        case JMPB_ASM:
+        case JAE_ASM:
+        case JBE_ASM:
+        case JMPE_ASM:
+        case CALL_ASM:
+        case RET_ASM:
+        case IN_ASM:
+        case OUT_ASM:
+        case HLT_ASM:
+        case DUP_ASM:
+        case CMP_ASM:
+        case OVER_ASM:
+        case SWAP_ASM:
+        case DSPL_ASM:
+
+        default:

@@ -1,3 +1,5 @@
+#include "cmds_and_regs_manual.h"
+
 enum register_nums : uint8_t {
 	AX_ASM = 1,
 	BX_ASM = 2,
@@ -66,3 +68,52 @@ enum registers_hash {
 	DX = 5862241,
 };
 
+typedef struct {
+	asm_commands_nums  cmd_asm_code;
+	const char*        cmd_string;
+	size_t             cmd_string_length;
+} enum_and_string_cmd;
+
+typedef struct {
+	register_nums  reg_asm_code;
+	const char*    reg_string;
+	size_t         reg_string_length;
+} enum_and_string_reg;
+
+enum_and_string_cmd enum_and_string_cmd_array[N_CMDS] {
+
+	{ PUSH_ASM, "PUSH", 4 },
+	{ POP_ASM, "POP", 3 },
+	{ ADD_ASM, "ADD", 3 },
+	{ SUB_ASM, "SUB", 3 },
+	{ MUL_ASM, "MUL", 3 },
+	{ DIV_ASM, "DIV", 3 },
+	{ SQRT_ASM, "SQRT", 4 },
+	{ MOD_ASM, "MOD", 3 },
+	{ JMP_ASM, "JMP", 3 },
+	{ JMPA_ASM, "JMPA", 4 },
+	{ JMPB_ASM, "JMPB", 4 },
+	{ JAE_ASM, "JAE", 3 },
+	{ JBE_ASM, "JBE", 3 },
+	{ JMPE_ASM, "JMPE", 4 },
+	{ CALL_ASM, "CALL", 4 },
+	{ RET_ASM, "RET", 3 },
+	{ IN_ASM, "IN", 2 },
+	{ OUT_ASM, "OUT", 3 },
+	{ HLT_ASM, "HLT", 3 },
+	{ DUP_ASM, "DUP", 3 },
+	{ CMP_ASM, "CMP", 3 },
+	{ OVER_ASM, "OVER", 4 },
+	{ SWAP_ASM, "SWAP", 4 },
+	{ DSPL_ASM, "DSPL", 4 },
+
+};
+
+enum_and_string_reg enum_and_string_reg_array[N_REGS] {
+
+	{ AX_ASM, "AX", 2 },
+	{ BX_ASM, "BX", 2 },
+	{ CX_ASM, "CX", 2 },
+	{ DX_ASM, "DX", 2 },
+
+};

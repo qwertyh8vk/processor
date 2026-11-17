@@ -11,5 +11,8 @@ const int max_len_for_space_regs = 2;
 
 int   enums_header_generator(const char* filename_out);
 int   enums_hash_header_generator(const char* filename_out);
+int   struct_cmds_gen(const char* filename_out); // REVIEW 
+int   struct_regs_gen(const char* filename_out); // REVIEW 
+
 void  print_hash_values(FILE*     file_out,     const char* const ptr_on_array[], 
                         const int array_length, const int         space_aligment);

@@ -4,6 +4,7 @@
 // TODO - assert
 // TODO - recalloc
 // FIXME - SIZEOF в long long
+// FIXME - передавать параметры по структуре
 
 int             main() {
 
@@ -14,7 +15,7 @@ int             main() {
     // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // // //
 
     const char*    to_be_assemblered = "testirovka.txt";
-    const char*    assemblered_file  = "assembler_test_field.bin";
+    const char*    assemblered_file  = "assembler_res.bin";
 
     struct stat    to_be_assemblered_struct;
 
@@ -210,10 +211,10 @@ potential_error assemble_file_second(char*         buffer_in,         uint8_t** 
                 PRINTF("assemble_file_second: <%s> command_line_ptr\n", command_line_ptr);
                 GETCHAR();
 
-                potential_error process_command_status   = process_command_byhash(command_hash,          single_command_line, 
-                                                                                  command_line_ptr,      labels_array, 
-                                                                                  &instruction_pointer,  bytecode, 
-                                                                                  bytecode_capacity);
+                potential_error process_command_status = process_command_byhash(command_hash,          single_command_line, 
+                                                                                command_line_ptr,      labels_array, 
+                                                                                &instruction_pointer,  bytecode, 
+                                                                                bytecode_capacity,     command_length);
                     
                 PRINTF("process_command_status: <%d>\n", process_command_status);
                 GETCHAR();
@@ -253,7 +254,7 @@ string_type     check_if_string_empty(char* string_to_check, int string_length) 
 potential_error process_command_byhash(uint32_t       command_hash,         char*           single_command_line, 
                                         char*         command_line_ptr,     long long*      labels_array,
                                         long long*    instruction_pointer,  uint8_t**       bytecode, 
-                                        long long*    bytecode_capacity) 
+                                        long long*    bytecode_capacity,    int             command_length) 
 {
     assert(single_command_line && command_line_ptr && labels_array && instruction_pointer && bytecode && bytecode_capacity);
 
@@ -288,6 +289,8 @@ potential_error process_command_byhash(uint32_t       command_hash,         char
         
         MACROS_DEFAULT_SITUATION();
         
+
+        // FIXME - передавать параметры через структуру!!!!
     }
 
     return OK;
@@ -376,8 +379,9 @@ potential_error parse_operand_push_pop(char*                command_line_ptr,
 
     //TODO - послать нахуй 123.5
 
-    char reg[MAX_COMMAND_LEN]   = {};
-    int  register_flag          = 0;
+    char reg[MAX_COMMAND_LEN]                   = {};
+    char array_to_check_reg[MAX_COMMAND_LEN]    = {};
+    int  register_flag                          = 0;
 
     *debug_index = 0; // NOTE - обнуляем чтобы каждый раз проверять дошёл ли сканф до конца обработки строки
 
@@ -449,13 +453,26 @@ potential_error parse_operand_push_pop(char*                command_line_ptr,
     if (register_flag != 0) {
         register_nums reg_enum = determine_register(reg);
         if (reg_enum < 0) { PRINTF("некорректный (нераспознанный) регистр.\n"); return INCORRECT_REG; }
+
+        potential_error determine_register_for_anti_collision_status = determine_register_for_anti_collision(reg_enum, array_to_check_reg);
+        if (determine_register_for_anti_collision_status != OK) { return determine_register_for_anti_collision_status; }
+        int strncmp_result = strncmp(reg, array_to_check_reg, MAX_COMMAND_LEN);
+    
+        if  (strncmp_result != 0 ) { 
+            PRINTF("register: мы попали в strncmp_result != 0\n"); 
+            GETCHAR(); 
+            return HASH_COLLISION; 
+        }
+            
         ptr_on_operand_struct->reg = reg_enum;
     }
 
     return OK;
 }
 
-potential_error validate_push_pop_command(char*               command_line_ptr, 
+potential_error validate_push_pop_command(char*               command_line_ptr,
+                                          char*               single_command_line, 
+                                          int                 command_length,
                                           asm_commands_nums   func_asm_code, 
                                           uint8_t**           bytecode,
                                           long long*          instruction_pointer,
@@ -465,6 +482,23 @@ potential_error validate_push_pop_command(char*               command_line_ptr,
 
     PRINTF("validate_push_pop_command (1)\nна каком мы сейчас символе: [%c], [%s]\n", *command_line_ptr, command_line_ptr);
     GETCHAR();
+
+    // ----------------------------------------------------------------- новая часть // REVIEW
+    PRINTF("Command Length которую мы получили: [%d]\n", command_length);
+    GETCHAR();
+
+    char array_to_fill[MAX_COMMAND_LEN] = {}; // нулями заиницилЫЗИЛ
+    potential_error determine_string_for_anti_collision_status = determine_string_for_anti_collision(func_asm_code, array_to_fill);
+    if (determine_string_for_anti_collision_status != OK) { return determine_string_for_anti_collision_status; }
+    
+    int  strncmp_result = strncmp(single_command_line, array_to_fill, command_length);
+    
+    if  (strncmp_result != 0 ) { 
+        PRINTF("мы попали в strncmp_result != 0\n"); 
+        GETCHAR(); 
+        return HASH_COLLISION; 
+    }
+    // ----------------------------------------------------------------- новая часть // REVIEW
 
     operand_data operand_data_struct = {};
     int debug_index = 0;
@@ -530,7 +564,57 @@ register_nums   determine_register(char* reg) {
     }
 }
 
-potential_error validate_zero_operands_commands(char*               command_line_ptr, 
+potential_error determine_string_for_anti_collision(asm_commands_nums func_asm_code, char* array_to_fill) {
+    if (func_asm_code >= 1 && func_asm_code <= N_CMDS) {
+        PRINTF("абсолютно корректный func_asm_code");
+        GETCHAR();
+
+        memcpy(array_to_fill, (enum_and_string_cmd_array[func_asm_code - 1]).cmd_string,
+                              (enum_and_string_cmd_array[func_asm_code - 1]).cmd_string_length);
+        
+        for (int i = 0; i < MAX_COMMAND_LEN; i++) {
+            if (array_to_fill[i] == '\0') { PRINTF("<\\0> "); }
+            else                          { PRINTF("<%c> ", array_to_fill[i]); }
+        }
+
+        PRINTF("\n");
+        return OK;
+    }
+   
+    else {
+        PRINTF("необработанный случай! determine_string_for_anti_collision, смотрите что пришло\n");
+        return HASH_PROBLEMS;
+    }
+}
+
+potential_error determine_register_for_anti_collision(register_nums reg_asm_code, char* array_to_fill) {
+    if (reg_asm_code >= 1 && reg_asm_code <= N_REGS) {
+
+        PRINTF("абсолютно корректный reg_asm_code");
+        GETCHAR();
+
+        memcpy(array_to_fill, (enum_and_string_reg_array[reg_asm_code - 1]).reg_string,
+                              (enum_and_string_reg_array[reg_asm_code - 1]).reg_string_length);
+        
+        for (int i = 0; i < MAX_COMMAND_LEN; i++) {
+            if (array_to_fill[i] == '\0') { PRINTF("<\\0> "); }
+            else                          { PRINTF("<%c> ", array_to_fill[i]); }
+        }
+
+        PRINTF("\n");
+        return OK;
+
+    }
+   
+    else {
+        PRINTF("необработанный случай! determine_register_for_anti_collision, смотрите что пришло\n");
+        return HASH_PROBLEMS;
+    }
+}
+
+potential_error validate_zero_operands_commands(char*               command_line_ptr,
+                                                char*               single_command_line,
+                                                int                 command_length,
                                                 asm_commands_nums   func_asm_code, 
                                                 uint8_t**           bytecode,
                                                 long long*          instruction_pointer,
@@ -540,6 +624,23 @@ potential_error validate_zero_operands_commands(char*               command_line
 
     PRINTF("validate_zero_operands_commands (1)\nна каком мы сейчас символе: [%c], [%s]\n", *command_line_ptr, command_line_ptr);
     GETCHAR();
+
+    // ----------------------------------------------------------------- новая часть // REVIEW
+    PRINTF("Command Length которую мы получили: [%d]\n", command_length);
+    GETCHAR();
+
+    char array_to_fill[MAX_COMMAND_LEN] = {}; // нулями заиницилЫЗИЛ
+    potential_error determine_string_for_anti_collision_status = determine_string_for_anti_collision(func_asm_code, array_to_fill);
+    if (determine_string_for_anti_collision_status != OK) { return determine_string_for_anti_collision_status; }
+    
+    int  strncmp_result = strncmp(single_command_line, array_to_fill, command_length);
+    
+    if  (strncmp_result != 0 ) { 
+        PRINTF("мы попали в strncmp_result != 0\n"); 
+        GETCHAR(); 
+        return HASH_COLLISION; 
+    }
+    // ----------------------------------------------------------------- новая часть // REVIEW
 
     while (*command_line_ptr == ' ') {
         command_line_ptr++;
@@ -580,6 +681,8 @@ potential_error check_string_after_arg(char* command_line_ptr) {
 }
 
 potential_error validate_commands_only_labels(char*              command_line_ptr, 
+                                              char*              single_command_line,
+                                              int                command_length,
                                               long long*         labels_array, 
                                               asm_commands_nums  func_asm_code,
                                               uint8_t**          bytecode,
@@ -590,6 +693,23 @@ potential_error validate_commands_only_labels(char*              command_line_pt
 
     PRINTF("validate_commands_only_labels (1)\nна каком мы сейчас символе: [%c], [%s]\n", *command_line_ptr, command_line_ptr);
     GETCHAR();
+
+    // ----------------------------------------------------------------- новая часть // REVIEW
+    PRINTF("Command Length которую мы получили: [%d]\n", command_length);
+    GETCHAR();
+
+    char array_to_fill[MAX_COMMAND_LEN] = {}; // нулями заиницилЫЗИЛ
+    potential_error determine_string_for_anti_collision_status = determine_string_for_anti_collision(func_asm_code, array_to_fill);
+    if (determine_string_for_anti_collision_status != OK) { return determine_string_for_anti_collision_status; }
+    
+    int  strncmp_result = strncmp(single_command_line, array_to_fill, command_length);
+    
+    if  (strncmp_result != 0 ) { 
+        PRINTF("мы попали в strncmp_result != 0\n"); 
+        GETCHAR(); 
+        return HASH_COLLISION; 
+    }
+    // ----------------------------------------------------------------- новая часть // REVIEW
     
     while (*command_line_ptr == ' ') {
         command_line_ptr++;
